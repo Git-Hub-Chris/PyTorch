@@ -7197,7 +7197,7 @@ class InvokeSubgraph(ExternKernel):
 @ir_dataclass(frozen=False)
 class Conditional(ExternKernel):
     predicate: Optional[IRNode] = None
-    operands: Optional[List[TensorBox]] = None
+    operands: Optional[List[Union[TensorBox, ShapeAsConstantBuffer]]] = None
     true_subgraph: Optional[Subgraph] = None
     false_subgraph: Optional[Subgraph] = None
     outputs: Optional[List[MultiOutput]] = None
@@ -7205,7 +7205,7 @@ class Conditional(ExternKernel):
     def __init__(
         self,
         predicate: IRNode,
-        operands: List[TensorBox],
+        operands: List[Union[TensorBox, ShapeAsConstantBuffer]],
         true_subgraph: Subgraph,
         false_subgraph: Subgraph,
         layout: MultiOutputLayout,
@@ -7215,15 +7215,13 @@ class Conditional(ExternKernel):
         self.true_subgraph = true_subgraph
         self.false_subgraph = false_subgraph
 
-        inputs = []
-        if not isinstance(predicate, ShapeAsConstantBuffer):
-            inputs.append(predicate)
-        inputs.extend(operands)
+        sym_args, tensor_args = _split_by_sym_type([predicate] + operands)
 
         super().__init__(
             name=None,
             layout=layout,
-            inputs=inputs,
+            inputs=tensor_args,
+            constant_args=sym_args,
         )
 
         self.name = V.graph.register_buffer(self)
@@ -7235,7 +7233,7 @@ class Conditional(ExternKernel):
         predicate: TensorBox,
         true_fn: Subgraph,
         false_fn: Subgraph,
-        operands: List[TensorBox],
+        operands: List[Union[TensorBox, ShapeAsConstantBuffer]],
     ):
         predicate = cls.realize_input(predicate)
         operands = [cls.realize_input(x) for x in operands]
@@ -7315,18 +7313,32 @@ class Conditional(ExternKernel):
         wrapper.codegen_conditional(self)
 
 
+def _split_by_sym_type(
+    args: List[Any],
+) -> Tuple[List[ShapeAsConstantBuffer], List[Any]]:
+    non_sym_args = []
+    sym_args = []
+    for arg in args:
+        if isinstance(arg, ShapeAsConstantBuffer):
+            sym_args.append(arg.expr)
+        else:
+            non_sym_args.append(arg)
+
+    return sym_args, non_sym_args
+
+
 @ir_dataclass(frozen=False)
 class WhileLoop(ExternKernel):
-    carried_inputs: Optional[List[TensorBox]] = None
-    additional_inputs: Optional[List[TensorBox]] = None
+    carried_inputs: Optional[List[Union[TensorBox, ShapeAsConstantBuffer]]] = None
+    additional_inputs: Optional[List[Union[TensorBox, ShapeAsConstantBuffer]]] = None
     cond_subgraph: Optional[Subgraph] = None
     body_subgraph: Optional[Subgraph] = None
     outputs: Optional[List[MultiOutput]] = None
 
     def __init__(
         self,
-        carried_inputs: List[TensorBox],
-        additional_inputs: List[TensorBox],
+        carried_inputs: List[Union[TensorBox, ShapeAsConstantBuffer]],
+        additional_inputs: List[Union[TensorBox, ShapeAsConstantBuffer]],
         cond_subgraph: Subgraph,
         body_subgraph: Subgraph,
         layout: MultiOutputLayout,
@@ -7336,12 +7348,13 @@ class WhileLoop(ExternKernel):
         self.cond_subgraph = cond_subgraph
         self.body_subgraph = body_subgraph
 
+        sym_args, tensor_args = _split_by_sym_type(carried_inputs + additional_inputs)
         super().__init__(
             name=None,
             layout=layout,
-            inputs=carried_inputs + additional_inputs,
+            inputs=tensor_args,
+            constant_args=sym_args,
         )
-
         self.name = V.graph.register_buffer(self)
         V.graph.register_operation(self)
 
@@ -7350,8 +7363,8 @@ class WhileLoop(ExternKernel):
         cls,
         cond_fn: Subgraph,
         body_fn: Subgraph,
-        carried_inputs: List[TensorBox],
-        additional_inputs: List[TensorBox],
+        carried_inputs: List[Union[TensorBox, ShapeAsConstantBuffer]],
+        additional_inputs: List[Union[TensorBox, ShapeAsConstantBuffer]],
     ):
         carried_inputs = [cls.realize_input(x) for x in carried_inputs]
         additional_inputs = [cls.realize_input(x) for x in additional_inputs]
