@@ -1,9 +1,11 @@
-# mypy: allow-untyped-defs
 from numbers import Number
+from typing import Any, Optional, Union
+from typing_extensions import Self
 
 import torch
 from torch import Tensor
 from torch.distributions import constraints
+from torch.distributions.constraints import Constraint
 from torch.distributions.distribution import Distribution
 from torch.distributions.transformed_distribution import TransformedDistribution
 from torch.distributions.transforms import SigmoidTransform
@@ -39,10 +41,19 @@ class LogitRelaxedBernoulli(Distribution):
     [2] Categorical Reparametrization with Gumbel-Softmax
     (Jang et al., 2017)
     """
-    arg_constraints = {"probs": constraints.unit_interval, "logits": constraints.real}
+    arg_constraints: dict[str, Constraint] = {
+        "probs": constraints.unit_interval,
+        "logits": constraints.real,
+    }
     support = constraints.real
 
-    def __init__(self, temperature, probs=None, logits=None, validate_args=None):
+    def __init__(
+        self,
+        temperature: Tensor,
+        probs: Optional[Union[Tensor, Number]] = None,
+        logits: Optional[Union[Tensor, Number]] = None,
+        validate_args: Optional[bool] = None,
+    ) -> None:
         self.temperature = temperature
         if (probs is None) == (logits is None):
             raise ValueError(
@@ -61,7 +72,7 @@ class LogitRelaxedBernoulli(Distribution):
             batch_shape = self._param.size()
         super().__init__(batch_shape, validate_args=validate_args)
 
-    def expand(self, batch_shape, _instance=None):
+    def expand(self, batch_shape: _size, _instance: Optional[Self] = None) -> Self:
         new = self._get_checked_instance(LogitRelaxedBernoulli, _instance)
         batch_shape = torch.Size(batch_shape)
         new.temperature = self.temperature
@@ -75,7 +86,7 @@ class LogitRelaxedBernoulli(Distribution):
         new._validate_args = self._validate_args
         return new
 
-    def _new(self, *args, **kwargs):
+    def _new(self, *args: Any, **kwargs: Any) -> Tensor:
         return self._param.new(*args, **kwargs)
 
     @lazy_property
@@ -100,7 +111,7 @@ class LogitRelaxedBernoulli(Distribution):
             uniforms.log() - (-uniforms).log1p() + probs.log() - (-probs).log1p()
         ) / self.temperature
 
-    def log_prob(self, value):
+    def log_prob(self, value: Tensor) -> Tensor:
         if self._validate_args:
             self._validate_sample(value)
         logits, value = broadcast_all(self.logits, value)
@@ -128,15 +139,25 @@ class RelaxedBernoulli(TransformedDistribution):
         probs (Number, Tensor): the probability of sampling `1`
         logits (Number, Tensor): the log-odds of sampling `1`
     """
-    arg_constraints = {"probs": constraints.unit_interval, "logits": constraints.real}
-    support = constraints.unit_interval
-    has_rsample = True
+    arg_constraints: dict[str, Constraint] = {
+        "probs": constraints.unit_interval,
+        "logits": constraints.real,
+    }
+    support = constraints.unit_interval  # type: ignore[assignment]
+    has_rsample: bool = True
+    base_dist: LogitRelaxedBernoulli
 
-    def __init__(self, temperature, probs=None, logits=None, validate_args=None):
+    def __init__(
+        self,
+        temperature: Tensor,
+        probs: Optional[Union[Tensor, Number]] = None,
+        logits: Optional[Union[Tensor, Number]] = None,
+        validate_args: Optional[bool] = None,
+    ) -> None:
         base_dist = LogitRelaxedBernoulli(temperature, probs, logits)
         super().__init__(base_dist, SigmoidTransform(), validate_args=validate_args)
 
-    def expand(self, batch_shape, _instance=None):
+    def expand(self, batch_shape: _size, _instance: Optional[Self] = None) -> Self:
         new = self._get_checked_instance(RelaxedBernoulli, _instance)
         return super().expand(batch_shape, _instance=new)
 
