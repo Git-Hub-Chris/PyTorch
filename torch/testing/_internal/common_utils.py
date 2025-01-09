@@ -1565,10 +1565,14 @@ TEST_WITH_AOT_EAGER: bool = TestEnvironment.def_flag(
     "TEST_WITH_AOT_EAGER",
     env_var="PYTORCH_TEST_WITH_AOT_EAGER",
 )
+TEST_WITH_SUBCLASSES: bool = TestEnvironment.def_flag(
+    "TEST_WITH_SUBCLASSES",
+    env_var="PYTORCH_TEST_WITH_SUBCLASSES",
+)
 TEST_WITH_TORCHDYNAMO: bool = TestEnvironment.def_flag(
     "TEST_WITH_TORCHDYNAMO",
     env_var="PYTORCH_TEST_WITH_DYNAMO",
-    implied_by_fn=lambda: TEST_WITH_TORCHINDUCTOR or TEST_WITH_AOT_EAGER,
+    implied_by_fn=lambda: TEST_WITH_TORCHINDUCTOR or TEST_WITH_AOT_EAGER or TEST_WITH_SUBCLASSES
 )
 
 if TEST_WITH_TORCHDYNAMO:
@@ -2649,6 +2653,8 @@ def check_if_enable(test: unittest.TestCase):
                     "dynamo_wrapped": TEST_WITH_TORCHDYNAMO,
                     "inductor": TEST_WITH_TORCHINDUCTOR,
                     "slow": TEST_WITH_SLOW,
+                    "subclasses_wrapped": TEST_WITH_SUBCLASSES,
+                    "aot_eager_wrapped": TEST_WITH_AOT_EAGER,
                 }
 
                 invalid_platforms = list(filter(lambda p: p not in platform_to_conditional, platforms))
@@ -3137,7 +3143,7 @@ class TestCase(expecttest.TestCase):
         test_cls = super_run.__self__
 
         # Are we compiling?
-        compiled = TEST_WITH_TORCHDYNAMO or TEST_WITH_AOT_EAGER or TEST_WITH_TORCHINDUCTOR
+        compiled = TEST_WITH_TORCHDYNAMO or TEST_WITH_TORCHINDUCTOR
         # Is the class strict and compiling?
         strict_default = False
         should_reset_dynamo = False
@@ -3187,10 +3193,15 @@ class TestCase(expecttest.TestCase):
         else:
             suppress_errors = torch._dynamo.config.suppress_errors
         with unittest.mock.patch("torch._dynamo.config.suppress_errors", suppress_errors):
+            # override_backend: Optional[str] = None
             if TEST_WITH_TORCHINDUCTOR:
                 super_run = torch._dynamo.optimize("inductor")(super_run)
             elif TEST_WITH_AOT_EAGER:
+                # override_backend = "aot_eager_decomp_partition"
                 super_run = torch._dynamo.optimize("aot_eager_decomp_partition")(super_run)
+            elif TEST_WITH_SUBCLASSES:
+                # override_backend = "test_subclasses"
+                super_run = torch._dynamo.optimize("test_subclasses")(super_run)
             elif TEST_WITH_TORCHDYNAMO:
                 # TorchDynamo optimize annotation
                 # Assume eager-generated GraphModules will not error out.
@@ -3231,6 +3242,7 @@ class TestCase(expecttest.TestCase):
                     method = getattr(self, self._testMethodName)
                     setattr(self, self._testMethodName, ignore_failure(method, key))
 
+            # with torch._dynamo.eval_frame.dynamo_override_backend(override_backend):
             super_run(result=result)
 
         if strict_mode or should_reset_dynamo:
