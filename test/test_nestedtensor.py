@@ -6619,10 +6619,10 @@ torch.cuda.synchronize()
                 v_nt.requires_grad = False
                 tq = q_nt_t.detach()
                 tk = k_nt_t.detach()
-                tv = v_nt_t.detach() 
+                tv = v_nt_t.detach()
                 with torch.no_grad():
                     attn_nt = torch.nn.functional.scaled_dot_product_attention(
-                        tq, tk, tv 
+                        tq, tk, tv
                     ).transpose(1, 2)
 
             attn_nts = attn_nt.unbind()
@@ -6640,7 +6640,9 @@ torch.cuda.synchronize()
             )
 
             if not skip_backward:
-                nt_grads = torch.autograd.grad(attn_nt.values().sum(), (q_nt, k_nt, v_nt))
+                nt_grads = torch.autograd.grad(
+                    attn_nt.values().sum(), (q_nt, k_nt, v_nt)
+                )
                 for nt_grad, d1_grad, d2_grad, grad_atol, grad_rtol in zip(
                     nt_grads, d1_grads, d2_grads, grad_atols, grad_rtols
                 ):
@@ -6677,8 +6679,14 @@ torch.cuda.synchronize()
                 check_forward_backward()
         val = os.getenv("TORCH_CUDNN_SDPA_NESTED_TENSOR_ENABLED")
         check_cudnn = int(val) if val is not None else 0
-        if 'cuda' in str(device) and check_cudnn and (dtype == torch.float16 or dtype == torch.bfloat16):
-            with torch.nn.attention.sdpa_kernel(torch.nn.attention.SDPBackend.CUDNN_ATTENTION):
+        if (
+            'cuda' in str(device)
+            and check_cudnn
+            and (dtype == torch.float16 or dtype == torch.bfloat16
+        ):
+            with torch.nn.attention.sdpa_kernel(
+                torch.nn.attention.SDPBackend.CUDNN_ATTENTION
+            ):
                 check_forward_backward(skip_backward=True)
 
     @skipIfTorchDynamo("SDPA test compiles internally")
