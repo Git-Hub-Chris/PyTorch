@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from torch.fx import Graph, GraphModule, Node
 from torch.fx._compatibility import compatibility
@@ -11,7 +11,7 @@ __all__ = ["SubgraphMatcherWithNameNodeMap"]
 
 def _split_to_graph_and_name_node_map(
     gm: GraphModule,
-) -> Tuple[GraphModule, Dict[str, Node]]:
+) -> tuple[GraphModule, Dict[str, Node]]:
     from torch.fx.graph import _PyTreeInfo
     from torch.utils._pytree import tree_flatten, tree_unflatten
 

@@ -4,7 +4,7 @@ import copy
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Sequence
 
 import torch
 from torch.fx._compatibility import compatibility
@@ -757,7 +757,7 @@ class _SplitterBase:
     # Helpers for split() method
     # ===============================================================
 
-    def starter_nodes(self) -> Tuple[NodeSet, NodeSet]:
+    def starter_nodes(self) -> tuple[NodeSet, NodeSet]:
         """
         Finds nodes that consume module inputs or get_attr nodes.
         """

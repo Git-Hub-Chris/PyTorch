@@ -1,6 +1,6 @@
 # mypy: allow-untyped-defs
 r"""Implementation for the Resilient backpropagation."""
-from typing import cast, List, Optional, Tuple, Union
+from typing import cast, List, Optional, Union
 
 import torch
 from torch import Tensor
@@ -30,8 +30,8 @@ class Rprop(Optimizer):  # noqa: D101
         self,
         params: ParamsT,
         lr: Union[float, Tensor] = 1e-2,
-        etas: Tuple[float, float] = (0.5, 1.2),
-        step_sizes: Tuple[float, float] = (1e-6, 50),
+        etas: tuple[float, float] = (0.5, 1.2),
+        step_sizes: tuple[float, float] = (1e-6, 50),
         *,
         capturable: bool = False,
         foreach: Optional[bool] = None,

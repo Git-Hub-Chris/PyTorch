@@ -5,7 +5,7 @@ import inspect
 import warnings
 from collections import abc, defaultdict
 from enum import Enum
-from typing import Any, cast, Dict, Iterable, List, Optional, overload, Tuple, Union
+from typing import Any, cast, Dict, Iterable, List, Optional, overload, Union
 
 import torch
 
@@ -153,7 +153,7 @@ class GradScaler:
 
     def _check_scale_growth_tracker(
         self, funcname: str
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         fix = "This may indicate your script did not use scaler.scale(loss or outputs) earlier in the iteration."
         assert self._scale is not None, (
             f"Attempted {funcname} but _scale is None.  " + fix
@@ -179,7 +179,7 @@ class GradScaler:
         ...
 
     @overload
-    def scale(self, outputs: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
+    def scale(self, outputs: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
         ...
 
     @overload

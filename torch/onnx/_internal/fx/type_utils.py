@@ -10,7 +10,6 @@ from typing import (
     Protocol,
     runtime_checkable,
     Sequence,
-    Tuple,
     TYPE_CHECKING,
     Union,
 )
@@ -245,7 +244,7 @@ BaseArgumentTypes = Union[
 ]
 Argument = Optional[
     Union[
-        Tuple["Argument", ...],
+        tuple["Argument", ...],
         Sequence["Argument"],
         Mapping[str, "Argument"],
         slice,  # Slice[Argument, Argument, Argument], but slice is not a templated type in typing

@@ -10,7 +10,6 @@ from typing import (
     Iterator,
     List,
     Optional,
-    Tuple,
     Type,
     TypeVar,
 )
@@ -176,5 +175,5 @@ class OrderedSet(MutableSet, Generic[T]):
     def __setstate__(self, state: List[T]) -> None:
         self._dict = dict.fromkeys(state, None)
 
-    def __reduce__(self) -> Tuple[Type[OrderedSet[T]], Tuple[List[T]]]:
+    def __reduce__(self) -> tuple[Type[OrderedSet[T]], tuple[List[T]]]:
         return (OrderedSet, (list(self),))

@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional, Tuple, Type
+from typing import Dict, Optional, Type
 
 import sympy
 
@@ -43,7 +43,7 @@ def try_solve(
     thing: sympy.Basic,
     trials: int = 5,
     floordiv_inequality: bool = True,
-) -> Optional[Tuple[sympy.Rel, sympy.Expr]]:
+) -> Optional[tuple[sympy.Rel, sympy.Expr]]:
     mirror = mirror_rel_op(type(expr))
 
     # Ignore unsupported expressions:

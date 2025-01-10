@@ -42,7 +42,6 @@ from typing import (
     NoReturn,
     Optional,
     Sequence,
-    Tuple,
     TYPE_CHECKING,
     TypeVar,
     Union,
@@ -993,7 +992,7 @@ class FxGraphCache:
         hints = [hint_int(s) for s in symints]
 
         def iterate_over_candidates() -> (
-            Generator[Tuple[CompiledFxGraph, bytes], None, None]
+            Generator[tuple[CompiledFxGraph, bytes], None, None]
         ):
             if local:
                 subdir = FxGraphCache._get_tmp_dir_for_key(key)

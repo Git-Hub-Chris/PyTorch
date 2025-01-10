@@ -10,7 +10,6 @@ from typing import (
     List,
     Optional,
     Sequence,
-    Tuple,
     TypeVar,
     Union,
 )
@@ -201,10 +200,10 @@ def infer_broadcast_dims_map(
 
 
 def map_placements_after_broadcast(
-    placements: Tuple[Placement, ...],
+    placements: tuple[Placement, ...],
     shape: torch.Size,
     broadcast_dims_map: List[int],
-) -> Tuple[Placement, ...]:
+) -> tuple[Placement, ...]:
     """Map each placement based on the output shape after broadcast."""
     new_placements: List[Placement] = []
     for placement in placements:

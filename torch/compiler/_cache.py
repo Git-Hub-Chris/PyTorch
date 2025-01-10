@@ -3,7 +3,7 @@ import logging
 import os
 import pickle
 from enum import Enum
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
 from torch._inductor.remote_cache import JsonDataTy, RemoteCacheJsonSerde
 from torch._inductor.runtime.runtime_utils import cache_dir
@@ -102,7 +102,7 @@ class CacheArtifactManager:
         cls._cache_artifacts.append(CacheArtifact(artifact_type, key, content))
 
     @classmethod
-    def serialize(cls) -> Optional[Tuple[bytes, CacheInfo]]:
+    def serialize(cls) -> Optional[tuple[bytes, CacheInfo]]:
         """
         Converts the "mega" list into portable format
         """

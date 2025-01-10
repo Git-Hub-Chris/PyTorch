@@ -1,7 +1,7 @@
 # mypy: allow-untyped-defs
 import gc
 import sys
-from typing import Any, Dict, List, NamedTuple, Optional, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional
 import types
 import weakref
 import json
@@ -258,7 +258,7 @@ class Node(NamedTuple):
     label: str
     context: Optional[str]
     root: bool
-    referrents: List[Tuple[str, int]]
+    referrents: List[tuple[str, int]]
 
 def create_graph(objects, *, context=None, filter=None):
     if context is None:

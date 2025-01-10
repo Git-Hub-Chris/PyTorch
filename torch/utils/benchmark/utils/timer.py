@@ -2,7 +2,7 @@
 import enum
 import timeit
 import textwrap
-from typing import overload, Any, Callable, Dict, List, NoReturn, Optional, Tuple, Type, Union
+from typing import overload, Any, Callable, Dict, List, NoReturn, Optional, Type, Union
 
 import torch
 from torch.utils.benchmark.utils import common, cpp_jit
@@ -470,7 +470,7 @@ class Timer:
         repeats: int,
         collect_baseline: bool,
         retain_out_file: bool,
-    ) -> Tuple[valgrind_timer_interface.CallgrindStats, ...]:
+    ) -> tuple[valgrind_timer_interface.CallgrindStats, ...]:
         ...
 
     def collect_callgrind(

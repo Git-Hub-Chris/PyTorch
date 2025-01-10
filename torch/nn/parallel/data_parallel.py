@@ -2,7 +2,7 @@
 import operator
 import warnings
 from itertools import chain
-from typing import Any, Dict, Generic, List, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, Sequence, TypeVar, Union
 
 import torch
 from torch._utils import (
@@ -200,7 +200,7 @@ class DataParallel(Module, Generic[T]):
 
     def scatter(
         self,
-        inputs: Tuple[Any, ...],
+        inputs: tuple[Any, ...],
         kwargs: Optional[Dict[str, Any]],
         device_ids: Sequence[Union[int, torch.device]],
     ) -> Any:

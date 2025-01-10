@@ -1,5 +1,5 @@
 import re
-from typing import Any, DefaultDict, Dict, List, Tuple, Union
+from typing import Any, DefaultDict, Dict, List, Union
 
 import numpy as np
 import sympy as sp
@@ -95,7 +95,7 @@ def calculate_value(
 def solve_equation(
     left_expression: Union[str, Any, None],
     right_expression: Union[str, Any, None],
-) -> Tuple[str, int]:
+) -> tuple[str, int]:
     expression = f"{left_expression} - {right_expression}"
     var = re.findall(s_pattern, expression)[0]
     if re.findall(parentheses_pattern, expression):

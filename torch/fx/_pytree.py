@@ -1,6 +1,6 @@
 # mypy: allow-untyped-defs
 from collections import namedtuple
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Type
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Type
 
 import torch.return_types
 from torch.utils._pytree import PyTree, TreeSpec
@@ -59,7 +59,7 @@ def _list_flatten_spec(d: List[Any], spec: TreeSpec) -> List[Any]:
     return [d[i] for i in range(spec.num_children)]
 
 
-def _tuple_flatten_spec(d: Tuple[Any], spec: TreeSpec) -> List[Any]:
+def _tuple_flatten_spec(d: tuple[Any], spec: TreeSpec) -> List[Any]:
     return [d[i] for i in range(spec.num_children)]
 
 
@@ -75,7 +75,7 @@ def _list_flatten_spec_exact_match(d: List[Any], spec: TreeSpec) -> bool:
     return len(d) == spec.num_children
 
 
-def _tuple_flatten_spec_exact_match(d: Tuple[Any], spec: TreeSpec) -> bool:
+def _tuple_flatten_spec_exact_match(d: tuple[Any], spec: TreeSpec) -> bool:
     return len(d) == spec.num_children
 
 

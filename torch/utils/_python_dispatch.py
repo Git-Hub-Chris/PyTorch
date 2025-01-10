@@ -3,7 +3,7 @@ import contextlib
 
 import warnings
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set, Union, Protocol, Tuple, Sequence, overload, Deque, Type
+from typing import Any, Dict, List, Optional, Set, Union, Protocol, Sequence, overload, Deque, Type
 from typing_extensions import TypeIs
 from collections import deque
 
@@ -293,7 +293,7 @@ class BaseTorchDispatchMode(TorchDispatchMode):
 
 # Subtypes which have __tensor_flatten__ and __tensor_unflatten__.
 class TensorWithFlatten(Protocol):
-    def __tensor_flatten__(self) -> Tuple[Sequence[str], object]:
+    def __tensor_flatten__(self) -> tuple[Sequence[str], object]:
         ...
 
     @staticmethod
@@ -307,7 +307,7 @@ class TensorWithFlatten(Protocol):
     shape: torch._C.Size
 
     @overload
-    def stride(self, dim: None = None) -> Tuple[int, ...]:
+    def stride(self, dim: None = None) -> tuple[int, ...]:
         ...
 
     @overload
@@ -315,7 +315,7 @@ class TensorWithFlatten(Protocol):
         ...
 
     @overload
-    def size(self, dim: None = None) -> Tuple[int, ...]:
+    def size(self, dim: None = None) -> tuple[int, ...]:
         ...
 
     @overload

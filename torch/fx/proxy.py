@@ -9,7 +9,7 @@ import logging
 import operator
 import sys
 from dataclasses import fields, is_dataclass
-from typing import Any, Callable, Dict, Iterator, Optional, OrderedDict, Tuple
+from typing import Any, Callable, Dict, Iterator, Optional, OrderedDict
 
 import torch
 import torch.fx.traceback as fx_traceback
@@ -135,17 +135,17 @@ class TracerBase:
     scope: Scope
 
     # Records the module call stack
-    module_stack: OrderedDict[str, Tuple[str, Any]]
+    module_stack: OrderedDict[str, tuple[str, Any]]
 
     # Mapping of node name to module scope
-    node_name_to_scope: Dict[str, Tuple[str, type]]
+    node_name_to_scope: Dict[str, tuple[str, type]]
 
     @compatibility(is_backward_compatible=True)
     def create_node(
         self,
         kind: str,
         target: Target,
-        args: Tuple[Argument, ...],
+        args: tuple[Argument, ...],
         kwargs: Dict[str, Argument],
         name: Optional[str] = None,
         type_expr: Optional[Any] = None,
@@ -211,7 +211,7 @@ class TracerBase:
         self,
         kind: str,
         target: Target,
-        args: Tuple[Any, ...],
+        args: tuple[Any, ...],
         kwargs: Dict[str, Any],
         name: Optional[str] = None,
         type_expr: Optional[Any] = None,

@@ -21,7 +21,6 @@ from typing import (
     NoReturn,
     Optional,
     Set,
-    Tuple,
     TYPE_CHECKING,
     TypeVar,
     Union,
@@ -382,7 +381,7 @@ class ConfigModule(ModuleType):
 
     def _get_alias_module_and_name(
         self, entry: _ConfigEntry
-    ) -> Optional[Tuple[ModuleType, str]]:
+    ) -> Optional[tuple[ModuleType, str]]:
         alias = entry.alias
         if alias is None:
             return None

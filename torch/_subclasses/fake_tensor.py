@@ -26,7 +26,6 @@ from typing import (
     Optional,
     Sequence,
     Set,
-    Tuple,
     Type,
     TYPE_CHECKING,
     TypeVar,
@@ -839,7 +838,7 @@ class FakeTensor(Tensor):
     @staticmethod
     def _find_common_device(
         func: OpOverload, flat_args: Sequence[object]
-    ) -> Tuple[torch.device, bool]:
+    ) -> tuple[torch.device, bool]:
         # Returns: (common_device, has_scalar_only_inputs)
 
         # cpu - zero-dim tensors can be called in cuda kernels,
@@ -934,8 +933,8 @@ class TensorMetadata:
     """
 
     dtype: torch.dtype
-    shape: Tuple[_MetadataIntLike, ...]
-    stride: Tuple[_MetadataIntLike, ...]
+    shape: tuple[_MetadataIntLike, ...]
+    stride: tuple[_MetadataIntLike, ...]
     device: torch.device
     layout: torch.layout
     memory_format: Optional[torch.memory_format]
@@ -1016,10 +1015,10 @@ class _DispatchCacheKey:
     Key for the FakeTensor dispatch cache.
     """
 
-    key: Tuple[object, ...]
+    key: tuple[object, ...]
     hashvalue: int
 
-    def __init__(self, tup: Tuple[object, ...]) -> None:
+    def __init__(self, tup: tuple[object, ...]) -> None:
         self.key = tup
         self.hashvalue = hash(tup)
 
@@ -1065,7 +1064,7 @@ class _DispatchCacheEntry:
     is_output_tuple flag helps in differentiating the return type
     """
 
-    output_infos: Tuple[_DispatchCacheEntryOutputInfo]
+    output_infos: tuple[_DispatchCacheEntryOutputInfo]
     is_output_tuple: bool = False
 
 
@@ -1201,7 +1200,7 @@ class FakeTensorMode(TorchDispatchMode):
         # If another fake mode was already active when we enter, we also stash it here.
         # That way when we exit, we know to re-enable the previous fake mode.
         self.enter_stack: List[
-            Tuple[bool, Optional[TorchDispatchMode], Optional[bool]]
+            tuple[bool, Optional[TorchDispatchMode], Optional[bool]]
         ] = []
 
         self.shape_env = shape_env
@@ -1726,7 +1725,7 @@ class FakeTensorMode(TorchDispatchMode):
         key: _DispatchCacheKey,
         func: OpOverload,
         args: Sequence[object],
-    ) -> Union[Optional[FakeTensor], Tuple[Optional[FakeTensor], ...]]:
+    ) -> Union[Optional[FakeTensor], tuple[Optional[FakeTensor], ...]]:
         """
         Create a new FakeTensor from the cache entry.
         """
@@ -1750,7 +1749,7 @@ class FakeTensorMode(TorchDispatchMode):
 
     def _crosscheck_cache_output(
         self,
-        output: Union[Optional[FakeTensor], Tuple[Optional[FakeTensor], ...]],
+        output: Union[Optional[FakeTensor], tuple[Optional[FakeTensor], ...]],
         func: OpOverload,
         types: Sequence[Type],
         args: Sequence[object],
@@ -2428,7 +2427,7 @@ class FakeTensorMode(TorchDispatchMode):
         converter: FakeTensorConverter,
         flat_args: Sequence[object],
         args_spec: TreeSpec,
-    ) -> Tuple[List[object], List[FakeTensor]]:
+    ) -> tuple[List[object], List[FakeTensor]]:
         """
         Checks if the list of tensors are fake tensors.
         If not, try to convert them to fake tensors.

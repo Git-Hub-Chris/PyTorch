@@ -1,6 +1,6 @@
 # mypy: allow-untyped-decorators
 # mypy: allow-untyped-defs
-from typing import cast, Dict, List, Optional, Tuple, TYPE_CHECKING, Union
+from typing import cast, Dict, List, Optional, TYPE_CHECKING, Union
 
 import torch
 from torch import Tensor
@@ -25,7 +25,7 @@ class Adafactor(Optimizer):
         params: ParamsT,
         lr: Union[float, Tensor] = 1e-2,
         beta2_decay: float = -0.8,
-        eps: Tuple[Optional[float], float] = (None, 1e-3),
+        eps: tuple[Optional[float], float] = (None, 1e-3),
         d: float = 1.0,
         weight_decay: float = 0.0,
         *,
@@ -412,7 +412,7 @@ def _single_tensor_adafactor(
 def _group_tensors_by_device_dtype_and_is_multidim(
     tensorlists: TensorListList,
 ) -> Dict[
-    Tuple[Optional[torch.device], Optional[torch.dtype], bool],
+    tuple[Optional[torch.device], Optional[torch.dtype], bool],
     List[List[Optional[Tensor]]],
 ]:
     """Groups tensors by device, dtype, AND multidimensionality -- whether the tensor
@@ -420,7 +420,7 @@ def _group_tensors_by_device_dtype_and_is_multidim(
     Adafactor to assume that every group of params will either be factored or not."""
     grouped_tensors = Optimizer._group_tensors_by_device_and_dtype(tensorlists)
     ultra_grouped_tensors: Dict[
-        Tuple[Optional[torch.device], Optional[torch.dtype], bool],
+        tuple[Optional[torch.device], Optional[torch.dtype], bool],
         List[List[Optional[Tensor]]],
     ] = {}
     for (device, dtype), (tensorlists, _) in grouped_tensors.items():

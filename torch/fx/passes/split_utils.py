@@ -1,7 +1,7 @@
 # mypy: allow-untyped-defs
 import copy
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Type, Union
+from typing import Dict, List, Optional, Type, Union
 
 import torch.fx
 from torch.fx._compatibility import compatibility
@@ -66,7 +66,7 @@ def split_by_tags(
     return_fqn_mapping: bool = False,
     return_tuple: bool = False,
     GraphModuleCls: Type[torch.fx.GraphModule] = torch.fx.GraphModule,
-) -> Union[torch.fx.GraphModule, Tuple[torch.fx.GraphModule, Dict[str, str]]]:
+) -> Union[torch.fx.GraphModule, tuple[torch.fx.GraphModule, Dict[str, str]]]:
     """
     Splits a GraphModule using tags on its graph nodes. We honor the order of
     tags. For example, we have tags = ["a", "b", "c"], the function will create

@@ -7,7 +7,7 @@ from pickle import (  # type: ignore[attr-defined]
     whichmodule as _pickle_whichmodule,
 )
 from types import ModuleType
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from ._mangling import demangle, get_mangle_prefix, is_mangled
 
@@ -53,7 +53,7 @@ class Importer(ABC):
         The contract is the same as for importlib.import_module.
         """
 
-    def get_name(self, obj: Any, name: Optional[str] = None) -> Tuple[str, str]:
+    def get_name(self, obj: Any, name: Optional[str] = None) -> tuple[str, str]:
         """Given an object, return a name that can be used to retrieve the
         object from this environment.
 

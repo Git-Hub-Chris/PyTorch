@@ -1,5 +1,5 @@
 import threading
-from typing import Any, cast, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, cast, Dict, List, Optional, Sequence, Union
 
 import torch
 from torch._utils import ExceptionWrapper
@@ -11,7 +11,7 @@ __all__ = ["get_a_var", "parallel_apply"]
 
 
 def get_a_var(
-    obj: Union[torch.Tensor, List[Any], Tuple[Any, ...], Dict[Any, Any]],
+    obj: Union[torch.Tensor, List[Any], tuple[Any, ...], Dict[Any, Any]],
 ) -> Optional[torch.Tensor]:
     if isinstance(obj, torch.Tensor):
         return obj

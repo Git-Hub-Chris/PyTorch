@@ -1,5 +1,5 @@
 # mypy: allow-untyped-defs
-from typing import Dict, Tuple
+from typing import Dict
 
 from torch.fx._compatibility import compatibility
 from torch.fx.graph import Graph
@@ -30,7 +30,7 @@ def lift_subgraph_as_module(
     subgraph: Graph,
     comp_name: str = "",
     class_name: str = "GraphModule",
-) -> Tuple[GraphModule, Dict[str, str]]:
+) -> tuple[GraphModule, Dict[str, str]]:
     """
     Create a GraphModule for subgraph, which copies the necessary attributes from the original parent graph_module.
 

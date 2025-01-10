@@ -12,7 +12,7 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass, fields, is_dataclass
 from enum import auto, Enum
-from typing import Any, Callable, List, Optional, Tuple, Type, TYPE_CHECKING
+from typing import Any, Callable, List, Optional, Type, TYPE_CHECKING
 
 import torch
 import torch.distributed as dist
@@ -853,7 +853,7 @@ class DistributedDataParallel(Module, Joinable):
             param_to_name_mapping,
             static_graph,
         )
-        self._comm_hooks: List[Tuple[Callable, object]] = []
+        self._comm_hooks: List[tuple[Callable, object]] = []
 
         if self.mixed_precision is not None:
             _setup_mixed_precision_params(self.mixed_precision, self.module)

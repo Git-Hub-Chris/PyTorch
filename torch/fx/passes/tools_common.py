@@ -2,7 +2,7 @@
 import collections
 import operator
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Set, Union
 
 import torch
 import torch.fx
@@ -18,7 +18,7 @@ __all__ = [
     "legalize_graph",
 ]
 
-Tensors = Union[Tuple[torch.Tensor], List[torch.Tensor]]
+Tensors = Union[tuple[torch.Tensor], List[torch.Tensor]]
 TensorOrTensors = Union[torch.Tensor, Tensors]
 NodeList = List[torch.fx.Node]
 NodeSet = Set[torch.fx.Node]
