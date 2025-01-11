@@ -6,16 +6,7 @@ import functools
 import inspect
 import itertools
 import types
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    TYPE_CHECKING,
-    TypeVar,
-)
+from typing import Any, Callable, Dict, List, Optional, Sequence, TYPE_CHECKING, TypeVar
 from typing_extensions import Never
 from unittest.mock import patch
 
@@ -76,7 +67,7 @@ def wrap_args_kwargs(tx: "InstructionTranslator", result):
             result[k] = wrap_bound_arg(tx, v)
 
 
-def init_cellvars(parent, result: Dict[str, VariableTracker], code):
+def init_cellvars(parent, result: dict[str, VariableTracker], code):
     """
     Update `result` to add mapping from local name to new cells created
     directly by `code`, or update SideEffects in `parent` if the a local cell is
@@ -200,7 +191,7 @@ class UserFunctionVariable(BaseUserFunctionVariable):
     def get_globals(self):
         return self.fn.__globals__
 
-    def bind_args(self, parent, args, kwargs) -> Dict[str, VariableTracker]:
+    def bind_args(self, parent, args, kwargs) -> dict[str, VariableTracker]:
         """
         Assume `args` and `kwargs` are VariableTracker arguments for a call to
         this function, create new bindings for initial locals.
@@ -957,7 +948,7 @@ class PolyfilledFunctionVariable(VariableTracker):
 
     @classmethod
     @functools.lru_cache(None)
-    def _get_polyfill_handlers(cls) -> Dict[Callable[..., Any], types.FunctionType]:
+    def _get_polyfill_handlers(cls) -> dict[Callable[..., Any], types.FunctionType]:
         return {}
 
     @classmethod

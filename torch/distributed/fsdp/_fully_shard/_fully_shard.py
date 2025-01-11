@@ -1,18 +1,7 @@
 # mypy: allow-untyped-decorators
 # mypy: allow-untyped-defs
 import functools
-from typing import (
-    Any,
-    Callable,
-    cast,
-    Dict,
-    Iterable,
-    List,
-    NoReturn,
-    Optional,
-    Type,
-    Union,
-)
+from typing import Any, Callable, cast, Iterable, List, NoReturn, Optional, Type, Union
 
 import torch
 import torch.nn as nn
@@ -42,7 +31,7 @@ __all__ = [
 ]
 
 
-cls_to_fsdp_cls: Dict[Type, Type] = {}
+cls_to_fsdp_cls: dict[Type, Type] = {}
 
 
 # The decorator adds a state object to `module` that can be accessed via

@@ -8,17 +8,7 @@ import re
 import sys
 import types
 import unittest
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    overload,
-    Sequence,
-    TypeVar,
-    Union,
-)
+from typing import Any, Callable, List, Optional, overload, Sequence, TypeVar, Union
 from typing_extensions import ParamSpec
 from unittest.mock import patch
 
@@ -140,7 +130,7 @@ def reduce_to_scalar_loss(out: torch.Tensor) -> torch.Tensor:
 
 @overload
 def reduce_to_scalar_loss(
-    out: Union[List[Any], tuple[Any, ...], Dict[Any, Any]]
+    out: Union[List[Any], tuple[Any, ...], dict[Any, Any]]
 ) -> float:
     ...
 
