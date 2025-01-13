@@ -2000,6 +2000,48 @@ class TestSelectAlgorithm(BaseTestSelectAlgorithm):
         self.assertEqual(counters["inductor"]["select_algorithm_autotune"], 1)
         self.assertEqual(counters["inductor"]["cpp_epilogue_fusion_counter"], 1)
 
+    @patches
+    @torch.no_grad
+    @unittest.skipIf(not TEST_MKL, "Test requires MKL")
+    @dtypes(torch.float)
+    def test_weight_offset(self, dtype):
+        try:
+            try:
+                from . import test_aot_inductor_utils
+            except ImportError:
+                import test_aot_inductor_utils
+        except Exception:
+            # skip this UT if import failed
+            return
+
+        class M(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                w = torch.randn(3, 64, 64)
+                self.weight = torch.nn.Parameter(w, requires_grad=False)
+
+            def forward(self, x, w):
+                # Test contiguous slice of weights
+                y = x @ w[2]
+                # Test non-contiguous slice of weights (will be copied)
+                y = y @ w[:, 2]
+                # Test mm slice of weight
+                return torch.mm(y[2], self.weight[2])
+
+        counters.clear()
+        x = torch.randn(3, 64, 64).to(dtype=dtype)
+        w = torch.randn(3, 3, 64, 64).to(dtype=dtype)
+        mod = M().to(dtype=dtype).eval()
+        with verify(dtype) as (atol, rtol), torch.no_grad():
+            expected = mod(x, w)
+            actual = test_aot_inductor_utils.AOTIRunnerUtil.run(
+                "cpu",
+                mod,
+                (x, w),
+            )
+            self.assertEqual(actual, expected, atol=atol, rtol=rtol)
+        self.assertEqual(counters["inductor"]["select_algorithm_autotune"], 3)
+
 
 @dynamo_config.patch({"dynamic_shapes": True, "assume_static_by_default": False})
 class _DynamicShapesTestBase(BaseTestSelectAlgorithm):

@@ -299,6 +299,18 @@ def get_padded_n(n, block_n):
     return (n + block_n - 1) // block_n * block_n
 
 
+def is_slice(node: ir.IRNode):
+    if isinstance(node, ir.ReinterpretView):
+        old_layout = node.data.get_layout()
+        new_layout = node.layout
+        return (
+            isinstance(node.data, ir.StorageBox)
+            and old_layout.size[-len(new_layout.size) :] == new_layout.size
+            and len(old_layout.size) > len(new_layout.size)
+        )
+    return False
+
+
 def transpose_w(
     W: Union[ir.IRNode, torch.Tensor], trans_w: bool
 ) -> Union[ir.IRNode, torch.Tensor]:
@@ -836,10 +848,8 @@ class CppGemmTemplate(CppTemplate):
             # It shouldn't happen as viewing an mkldnn tensor, we can extend the
             # implementation if it does.
             assert not isinstance(new_inputs[1], ir.BaseView)
-        # Note that the layout of MKLDNN Tensor is with the wrong stride
-        view_size = new_inputs[1].layout.size
-        view_stride = new_inputs[1].layout.stride
-        view_offset = new_inputs[1].layout.offset
+        # Save the original weight node for getting unwrapping layout once we know if blocking is used
+        original_weight_node = new_inputs[1]
 
         def maybe_to_dense(inputs, layout_or_out):
             new_inputs = list(inputs)
@@ -895,6 +905,17 @@ class CppGemmTemplate(CppTemplate):
         )
         assert micro_gemm is not None
         block_weights = cls.check_if_block_weight(new_inputs[1], micro_gemm)
+
+        # Note that the layout of MKLDNN Tensor is with the wrong stride
+        if is_slice(original_weight_node) and not block_weights:
+            # If weight is a slice of a larger tensor, we need to use the layout of the whole tensor
+            # instead of just the slice because the GEMM template expects the whole tensor.
+            view_layout = original_weight_node.data.get_layout()
+        else:
+            view_layout = original_weight_node.layout
+        view_size = view_layout.size
+        view_stride = view_layout.stride
+        view_offset = view_layout.offset
 
         def preprocessor(inputs, layout):
             new_inputs, new_layout = normalize_shapes(
