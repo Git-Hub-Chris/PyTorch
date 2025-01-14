@@ -8938,6 +8938,144 @@ class TestNestedInt(torch.testing._internal.common_utils.TestCase):
         self.assertTrue(a * 2 == 2 * a)
 
 
+from torch.nested._internal.cached_tensor import CachedTensor
+
+
+class TestCachedTensor(torch.testing._internal.common_utils.TestCase):
+    def test_basic_eager(self):
+        # Create some tensors
+        a = torch.tensor([1, 2, 3], dtype=torch.float32)
+        b = torch.tensor([4, 5, 6], dtype=torch.float32)
+        c = torch.tensor([7, 8, 9], dtype=torch.float32)
+        metadata = {"a": a, "b": b, "c": None}
+        # Create CachedTensor with source_fields="a"
+        cached_tensor = CachedTensor(metadata, source_field="a")
+        # Test that cached_tensor is created correctly
+        self.assertIsInstance(cached_tensor, CachedTensor)
+        # Test that cached_tensor's shape matches 'a'
+        self.assertEqual(cached_tensor.shape, a.shape)
+        # Accessing a field that is listed in all_fields but not present in metadata returns
+        # None instead of raising AttributeError.
+        self.assertIsNone(cached_tensor.c, c)
+
+        # Create CachedTensor with source_field='b'
+        cached_tensor_b = CachedTensor(metadata, source_field="b")
+        self.assertEqual(cached_tensor_b.shape, b.shape)
+
+        # Test that accessing a non-existent field raises AttributeError
+        with self.assertRaises(AttributeError):
+            _ = cached_tensor.d
+
+    def test_open_registration(self):
+        from torch.nested._internal.cached_tensor import (
+            register_cached_tensor_func,
+            set_func_registry,
+        )
+
+        tmp_registry = {}
+
+        with set_func_registry(tmp_registry):
+            # Create some tensors
+            a = torch.tensor([1, 2, 3], dtype=torch.float32)
+            b = torch.tensor([4, 5, 6], dtype=torch.float32)
+            c = torch.tensor([7, 8, 9], dtype=torch.float32)
+            metadata = {"a": a, "b": b, "c": c}
+            cached_tensor = CachedTensor(metadata, source_field="a")
+
+            # Before registration, clone errors
+            with self.assertRaisesRegex(
+                NotImplementedError,
+                "CachedTensor does not support for aten.clone.default",
+            ):
+                cached_tensor.clone()
+
+            # Define a custom clone function that rewraps the output into
+            # a new CachedTensor.
+            @register_cached_tensor_func(torch.ops.aten.clone.default)
+            def cached_tensor_clone(op, inp, *args, **kwargs):
+                cloned_metadata = {}
+                for k, v in inp.metadata.items():
+                    cloned_metadata[k] = v.clone()
+                return CachedTensor(
+                    cloned_metadata,
+                    inp.source_field,
+                )
+
+            cloned_cached_tensor = cached_tensor.clone()
+            self.assertIsInstance(cloned_cached_tensor, CachedTensor)
+
+            for key in cached_tensor.metadata.keys():
+                assert isinstance(cloned_cached_tensor, CachedTensor)
+                self.assertEqual(
+                    cloned_cached_tensor.metadata[key], cached_tensor.metadata[key]
+                )
+                self.assertFalse(
+                    cloned_cached_tensor.metadata[key] is cached_tensor.metadata[key]
+                )
+
+        # After leaving the context, clone behaves as it did before.
+        with self.assertRaisesRegex(
+            NotImplementedError, "CachedTensor does not support for aten.clone.default"
+        ):
+            cached_tensor.clone()
+
+    def test_basic_compile(self):
+        from torch.nested._internal.cached_tensor import (
+            register_cached_tensor_func,
+            set_func_registry,
+        )
+
+        tmp_registry = {}
+
+        with set_func_registry(tmp_registry):
+
+            @register_cached_tensor_func(torch.ops.aten.clone.default)
+            def cached_tensor_clone(op, inp, *args, **kwargs):
+                # Unwraps to the source and clones
+                out = inp.metadata[inp.source_field].clone()
+                print(isinstance(out, CachedTensor))
+                return out
+
+            #
+            # Construct CachedTensor outside the graph
+            #
+            a = torch.tensor([1, 2, 3], dtype=torch.float32)
+            b = torch.tensor([4, 5, 6], dtype=torch.float32)
+            c = torch.tensor([7, 8, 9], dtype=torch.float32)
+            metadata = {"a": a, "b": b, "c": c}
+
+            cached_tensor = CachedTensor(
+                metadata,
+                source_field="a",
+            )
+
+            @torch.compile(fullgraph=True)
+            def fn1(x):
+                return x.clone().clone()
+
+            out = fn1(cached_tensor)
+            self.assertFalse(isinstance(out, CachedTensor))
+
+            #
+            # Construct CachedTensor inside the graph
+            #
+            a = torch.tensor([1, 2, 3], dtype=torch.float32)
+            b = torch.tensor([4, 5, 6], dtype=torch.float32)
+            c = torch.tensor([7, 8, 9], dtype=torch.float32)
+            metadata = {"a": a, "b": b, "c": c}
+
+            @torch.compile(fullgraph=True)
+            def fn2(y):
+                x = CachedTensor(
+                    metadata,
+                    source_field="a",
+                )
+                return x.clone() * y
+
+            out = fn2(a.clone())
+            self.assertFalse(isinstance(out, CachedTensor))
+
+
 instantiate_parametrized_tests(TestNestedTensor)
 instantiate_device_type_tests(TestNestedTensorDeviceType, globals())
 instantiate_device_type_tests(TestNestedTensorAutograd, globals())
