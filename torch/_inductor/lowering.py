@@ -35,6 +35,7 @@ from torch._prims_common import (
     Number,
 )
 from torch.fx.experimental.sym_node import magic_methods, method_to_operator
+from torch.fx.experimental.symbolic_shapes import free_unbacked_symbols
 from torch.utils._ordered_set import OrderedSet
 from torch.utils._sympy.functions import (
     CeilDiv,
@@ -993,6 +994,11 @@ if hasattr(aten, "lift_fresh"):
 @register_lowering(aten.squeeze, type_promotion_kind=None)
 def squeeze(x, dim=None):
     assert isinstance(x, TensorBox)
+    if free_unbacked_symbols(x.get_size()):
+        # Unbacked input needs to realized to correctly handle sizes and strides
+        x = ir.ExternKernel.realize_input(x)
+        return TensorBox(SqueezeView.create(x, dim=dim))
+
     if dim is None:
         return TensorBox(SqueezeView.create(x.data))
 
@@ -1081,8 +1087,6 @@ def trunc(x):
 
 @register_lowering(aten.expand, type_promotion_kind=None)
 def expand(x, sizes):
-    from torch.fx.experimental.symbolic_shapes import free_unbacked_symbols
-
     (x,) = promote_constants([x])
     if isinstance(x, ir.BaseConstant):
         return ExpandView.create(x, tuple(sizes))
