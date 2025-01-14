@@ -13,6 +13,8 @@ from typing import Any, Callable, List, Sequence, TYPE_CHECKING
 
 import torch
 
+from ..utils import dict_keys
+
 
 if TYPE_CHECKING:
     # Load by torch._dynamo.polyfills.loader
@@ -203,3 +205,18 @@ def object_ne(self, other):
     # https://github.com/python/cpython/blob/a1c52d1265c65bcf0d9edf87e143843ad54f9b8f/Objects/typeobject.c#L6235-L6255
     # Using `==` is important because `self` might have a user-defined `__eq__`.
     return not (self == other)
+
+
+def cmp_eq(a, b):
+    # Note that the commented `is` check should ideally be removed. This is a
+    # CPython optimization that skips the __eq__ checks it the obj id's are
+    # same. But, these lines adds many `is` nodes in the Fx graph for
+    # SymNodeVariable. For now, we can just skip this check. This is STILL
+    # correct because one of the __eq__ checks will pass later, just could be
+    # slow in some corner cases.
+    # if a is b:
+    #     return True
+    result = a.__eq__(b)
+    if result is NotImplemented:
+        result = b.__eq__(a)
+    return result is not NotImplemented and result

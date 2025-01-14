@@ -9,7 +9,7 @@ from torch._dynamo.source import AttrSource, GetItemSource
 from .. import variables
 from ..exc import unimplemented
 from ..utils import common_constant_types, istype, np
-from .base import typestr, VariableTracker
+from .base import VariableTracker
 
 
 if TYPE_CHECKING:
@@ -187,8 +187,7 @@ its type to `common_constant_types`.
             search = args[0].as_python_constant()
             result = search in self.value
             return ConstantVariable.create(result)
-
-        unimplemented(f"const method call {typestr(self.value)}.{name}")
+        return super().call_method(tx, name, args, kwargs)
 
     def call_hasattr(self, tx: "InstructionTranslator", name: str) -> "VariableTracker":
         result = hasattr(self.value, name)
@@ -220,6 +219,8 @@ class EnumVariable(VariableTracker):
         return self.value
 
     def var_getattr(self, tx: "InstructionTranslator", name):
+        if name == "__eq__":
+            return variables.GetAttrVariable(self, name)
         member = getattr(self.value, name)
         source = self.source and AttrSource(self.source, name)
         return VariableTracker.build(tx, member, source=source)

@@ -16,7 +16,7 @@ import torch
 from torch import sym_float, sym_int
 from torch.utils._python_dispatch import is_traceable_wrapper_subclass
 
-from .. import config, variables
+from .. import config, polyfills, variables
 from ..exc import (
     AttributeMutationError,
     unimplemented,
@@ -464,6 +464,20 @@ class BuiltinVariable(VariableTracker):
         def create_cmp_op_handlers(op):
             def compare_by_value(tx: "InstructionTranslator", a, b):
                 return ConstantVariable(op(a.value, b.value))
+
+            if op is operator.eq:
+                # For constants, speedup the comparison instead of using
+                # polyfill. Removing this line causes major regression for pr
+                # time benchmark - add_loop_eager.
+                result = [((ConstantVariable, ConstantVariable), compare_by_value)]
+
+                def handler(tx, a, b):
+                    return tx.inline_user_function_return(
+                        VariableTracker.build(tx, polyfills.cmp_eq), [a, b], {}
+                    )
+
+                result.append(((VariableTracker, VariableTracker), handler))
+                return result
 
             result = [((ConstantVariable, ConstantVariable), compare_by_value)]
 
@@ -1712,6 +1726,8 @@ class BuiltinVariable(VariableTracker):
                 member, (torch._ops.OpOverloadPacket, torch._ops.OpOverload)
             ) and torch._dynamo.trace_rules.is_aten_op_or_tensor_method(member):
                 return variables.TorchInGraphFunctionVariable(member, source=source)
+            elif name == "__eq__":
+                return variables.GetAttrVariable(obj, name, source=source)
         elif isinstance(obj, DummyModule):
             # TODO(mlazos) - Do we need this?
             if obj.is_torch or name not in obj.value.__dict__:
