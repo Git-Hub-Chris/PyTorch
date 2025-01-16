@@ -582,16 +582,29 @@ def full_like(
     device: Optional[torch.device] = None,
     pin_memory: bool = False,
     requires_grad: bool = False,
-    memory_format: torch.memory_format = torch.preserve_format,
+    memory_format: Optional[torch.memory_format] = torch.preserve_format,
 ) -> torch.Tensor:
-    return torch.full(
+    # Can't use aten.fill_ as that dispatches to full_like
+    full = torch.full(
         [*self.size()],
         fill_value,
         dtype=dtype or self.dtype,
         layout=layout or self.layout,
         device=device or self.device,
         requires_grad=requires_grad,
-    ).to(memory_format=get_like_layout(self, memory_format))
+    )
+    if memory_format is torch.preserve_format or memory_format is None:
+        result = torch.empty_like(
+            self,
+            dtype=dtype,
+            device=device,
+            memory_format=memory_format,
+            pin_memory=pin_memory,
+            requires_grad=requires_grad,
+        )
+        return aten.copy(result, full)
+    else:
+        return full.to(memory_format=memory_format)
 
 
 @register_decomposition(aten.randint_like.default)
