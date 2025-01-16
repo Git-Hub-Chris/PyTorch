@@ -398,7 +398,7 @@ auto approximate_type = get_gelutype_enum(approximate);
       x, y, ideep::algorithm::eltwise_gelu_erf, ideep::prop_kind::forward_training, /*alpha*/ 0.0);
 #ifdef __aarch64__
   } else if (use_mkldnn(self) && (approximate_type == GeluType::Tanh)) {
-    const ideep::tensor& x = itensor_from_tensor(self);
+    const ideep::tensor& x = itensor_from_tensor(self, /*from_const_data_ptr*/true);
     ideep::tensor y = itensor_from_tensor(result);
     ideep::eltwise_forward::compute(
       x, y, ideep::algorithm::eltwise_gelu_tanh, ideep::prop_kind::forward_training, /*alpha*/ 0.0);
@@ -573,13 +573,13 @@ Tensor math_mish_backward(
 }
 
 template <typename scalar_t>
-inline void _rrelu_with_noise_train(
+static void _rrelu_with_noise_train(
     Tensor& output,
     const Tensor& input,
     Tensor& noise,
     const Scalar& lower_,
     const Scalar& upper_,
-    std::optional<Generator> generator) {
+    const std::optional<Generator>& generator) {
   using opmath_t = at::opmath_type<scalar_t>;
   opmath_t lower = lower_.to<opmath_t>();
   opmath_t upper = upper_.to<opmath_t>();

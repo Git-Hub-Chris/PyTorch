@@ -3,15 +3,17 @@
 
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Annotated, Dict, List, Optional, Tuple
+from typing import Annotated, Dict, List, Optional
 
 from torch._export.serde.union import _Union
 
 # NOTE: Please update this value if any modifications are made to the schema
-SCHEMA_VERSION = (8, 2)
+SCHEMA_VERSION = (8, 5)
 TREESPEC_VERSION = 1
 
 
+# NOTE: If you updated the schema, please run `scripts/export/update_schema.py`
+# to update the auto generated files.
 class ScalarType(IntEnum):
     UNKNOWN = 0
     BYTE = 1
@@ -28,6 +30,8 @@ class ScalarType(IntEnum):
     BOOL = 12
     BFLOAT16 = 13
     UINT16 = 28
+    FLOAT8E4M3FN = 29
+    FLOAT8E5M2 = 30
 
 
 class Layout(IntEnum):
@@ -151,7 +155,7 @@ class TokenArgument:
 @dataclass(repr=False)
 class OptionalTensorArgument(_Union):
     as_tensor: Annotated[TensorArgument, 20]
-    as_none: Annotated[Tuple[()], 10]
+    as_none: Annotated[bool, 10]
 
 
 @dataclass
@@ -169,7 +173,7 @@ class CustomObjArgument:
 # This is actually a union type
 @dataclass(repr=False)
 class Argument(_Union):
-    as_none: Annotated[Tuple[()], 10]
+    as_none: Annotated[bool, 10]
     as_tensor: Annotated[TensorArgument, 20]
     as_tensors: Annotated[List[TensorArgument], 30]
     as_int: Annotated[int, 50]
@@ -195,11 +199,19 @@ class Argument(_Union):
     as_sym_float: Annotated[SymFloatArgument, 230]
     as_sym_floats: Annotated[List[SymFloatArgument], 240]
 
+
+class ArgumentKind(IntEnum):
+    UNKNOWN = 0
+    POSITIONAL = 1
+    KEYWORD = 2
+
+
 @dataclass
 class NamedArgument:
     # Argument name from the operator schema
     name: Annotated[str, 10]
     arg: Annotated[Argument, 20]
+    kind: Annotated[Optional[ArgumentKind], 30] = None
 
 
 @dataclass
@@ -208,6 +220,7 @@ class Node:
     inputs: Annotated[List[NamedArgument], 20]
     outputs: Annotated[List[Argument], 30]
     metadata: Annotated[Dict[str, str], 40]
+    is_hop_single_tensor_return: Annotated[Optional[bool], 50] = None
 
 
 @dataclass
@@ -234,7 +247,7 @@ class UserInputSpec:
 
 @dataclass(repr=False)
 class ConstantValue(_Union):
-    as_none: Annotated[Tuple[()], 10]
+    as_none: Annotated[bool, 10]
     as_int: Annotated[int, 20]
     as_float: Annotated[float, 30]
     as_string: Annotated[str, 40]
