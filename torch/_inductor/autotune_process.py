@@ -51,7 +51,7 @@ if TYPE_CHECKING:
 
 from . import config
 from .codegen.common import WorkspaceZeroMode
-from .runtime.benchmarking import benchmarker
+from .runtime.benchmarking import benchmarker, LazyBenchmark
 from .virtualized import V
 
 
@@ -138,7 +138,7 @@ class TuningProcess:
             elif isinstance(obj, Ping):
                 response_queue.put(Pong())
             elif isinstance(obj, BenchmarkRequest):
-                response_queue.put(obj.benchmark())
+                response_queue.put(obj.benchmark(lazy=False))
             else:
                 raise RuntimeError(f"Invalid request type {type(obj)}")
 
@@ -525,14 +525,16 @@ class BenchmarkRequest:
         fn,
         *input_tensors: torch.Tensor,
         output_tensor: Optional[torch.Tensor] = None,
-    ) -> float:
+        lazy: bool = False,
+    ) -> Union[LazyBenchmark, float]:
         raise NotImplementedError
 
     def benchmark(
         self,
         *input_tensors: torch.Tensor,
         output_tensor: Optional[torch.Tensor] = None,
-    ) -> float:
+        lazy: bool = False,
+    ) -> Union[LazyBenchmark, float]:
         debug = log.isEnabledFor(logging.DEBUG)
         if debug:
             start_ts = time.time()
@@ -557,7 +559,7 @@ class BenchmarkRequest:
             load_elapse = time.time() - start_ts  # type: ignore[possibly-undefined]
             start_ts = time.time()
 
-        out = self.do_bench(fn, *input_tensors, output_tensor)
+        out = self.do_bench(fn, *input_tensors, output_tensor, lazy=lazy)
 
         if debug:
             bench_elapse = time.time() - start_ts  # type: ignore[possibly-undefined]
@@ -582,8 +584,11 @@ class TestBenchmarkRequest(BenchmarkRequest):
         self.value = value
 
     def benchmark(
-        self, *input_tensors: torch.Tensor, output_tensor: Optional[torch.Tensor] = None
-    ) -> float:
+        self,
+        *input_tensors: torch.Tensor,
+        output_tensor: Optional[torch.Tensor] = None,
+        lazy: bool = False,
+    ) -> Union[LazyBenchmark, float]:
         if self.value is None:
             raise Exception("Failed to run")  # noqa: TRY002
         return self.value
@@ -595,7 +600,8 @@ class GPUDeviceBenchmarkMixin:
         fn,
         *input_tensors: torch.Tensor,
         output_tensor: Optional[torch.Tensor] = None,
-    ) -> float:
+        lazy: bool = False,
+    ) -> Union[LazyBenchmark, float]:
         device_idx_set = OrderedSet(
             tensor.device.index
             for tensor in [*input_tensors, output_tensor]
@@ -618,10 +624,9 @@ class GPUDeviceBenchmarkMixin:
         else:
             device_idx = device_interface.current_device()
         with device_interface.device(device_idx):  # type: ignore[attr-defined]
-            out = benchmarker.benchmark_gpu(fn)
-            device_interface.synchronize()  # shake out any CUDA errors
-
-        return out
+            if lazy:
+                return benchmarker.lazy_benchmark_gpu(fn)
+            return benchmarker.benchmark_gpu(fn)
 
 
 class CPUDeviceBenchmarkMixin:
@@ -630,7 +635,10 @@ class CPUDeviceBenchmarkMixin:
         fn,
         *input_tensors: torch.Tensor,
         output_tensor: Optional[torch.Tensor] = None,
-    ) -> float:
+        lazy: bool = False,
+    ) -> Union[LazyBenchmark, float]:
+        if lazy:
+            return benchmarker.lazy_benchmark_cpu(fn)
         return benchmarker.benchmark_cpu(fn)
 
 

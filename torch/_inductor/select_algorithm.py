@@ -33,7 +33,6 @@ import sympy
 
 import torch
 import torch._inductor.async_compile  # noqa: F401 required to warm up AsyncCompile pools
-from torch._dynamo.device_interface import get_interface_for_device
 from torch._dynamo.testing import rand_strided
 from torch._dynamo.utils import counters, dynamo_timed, identity, preserve_rng_state
 from torch.utils._filelock import FileLock
@@ -65,12 +64,11 @@ from .codegen.triton_utils import config_of, signature_to_meta
 from .exc import CUDACompileError
 from .ir import ChoiceCaller, PrimitiveInfoType
 from .ops_handler import StoreMode
-from .runtime.benchmarking import benchmarker
+from .runtime.benchmarking import benchmarker, LazyBenchmark
 from .runtime.hints import DeviceProperties
 from .utils import (
     FakeIndentedBuffer,
     get_dtype_size,
-    is_gpu,
     Placeholder,
     restore_stdout_stderr,
     sympy_dot,
@@ -1318,9 +1316,9 @@ class TritonTemplateCaller(ir.TritonTemplateCallerBase):
             allowed_prologue_inps if allowed_prologue_inps is not None else OrderedSet()
         )
 
-    def benchmark(self, *args, out):
+    def benchmark(self, *args, out, lazy=False):
         assert self.bmreq is not None
-        return self.bmreq.benchmark(*args, output_tensor=out)
+        return self.bmreq.benchmark(*args, output_tensor=out, lazy=lazy)
 
     def precompile(self):
         assert self.bmreq is not None
@@ -1390,12 +1388,12 @@ class ExternKernelCaller(ChoiceCaller):
     def __str__(self) -> str:
         return f"ExternKernelCaller({self.choice.call_name()})"
 
-    def benchmark(self, *args, out):
+    def benchmark(self, *args, out, lazy=False):
         if out.numel() == 0:
             # no need to run the kerrnel of do benchmarking
             return 0.0
         if self.has_out_variant:
-            return super().benchmark(*args, out=out)
+            return super().benchmark(*args, out=out, lazy=lazy)
         else:
             algo = self.to_callable()
             out_new = algo(*args)
@@ -1403,7 +1401,11 @@ class ExternKernelCaller(ChoiceCaller):
                 out_new, tuple(out.size()), tuple(out.stride())
             )
             out.copy_(out_new)  # for correctness checking
-            return benchmarker.benchmark(algo, args, {})
+            if lazy:
+                timing = benchmarker.lazy_benchmark(algo, args, {})
+            else:
+                timing = benchmarker.benchmark(algo, args, {})
+            return timing
 
     def to_callable(self):
         fn = self.choice.to_callable()
@@ -1501,9 +1503,9 @@ class DataProcessorChoiceCallerWrapper:
     def __getattr__(self, name):
         return getattr(self._wrapped, name)
 
-    def benchmark(self, *args, out) -> float:
+    def benchmark(self, *args, out, lazy=False) -> Union[LazyBenchmark, float]:
         new_args, new_out = self._preprocessor(args, out)
-        result = self._wrapped.benchmark(*new_args, out=new_out)
+        result = self._wrapped.benchmark(*new_args, out=new_out, lazy=lazy)
         new_out = self._postprocessor(new_out)
         if out is not new_out:
             out.copy_(new_out)
@@ -1961,7 +1963,7 @@ class AlgorithmSelectorCache(PersistentCache):
             )
             expected = None
             if VERIFY:
-                choices[0].benchmark(*example_inputs_extern, out=out_extern)
+                choices[0].benchmark(*example_inputs_extern, out=out_extern, lazy=False)
                 expected = out_extern.clone()
 
             return AutotuneArgs.from_choice_args(
@@ -1977,20 +1979,14 @@ class AlgorithmSelectorCache(PersistentCache):
 
         def benchmark_choice_in_current_process(
             choice: ChoiceCaller, autotune_args: AutotuneArgs
-        ) -> float:
+        ) -> Union[LazyBenchmark, float]:
             is_extern = isinstance(choice, ExternKernelCaller)
             benchmark_tensors = autotune_args.get_benchmark_tensors(is_extern)
             inpts, output = benchmark_tensors.unpack()
             output.zero_()
-            result = choice.benchmark(*inpts, out=output)
-            device_type = next(
-                (tensor.device.type for tensor in inpts if is_gpu(tensor.device.type)),
-                "cuda",
-            )
-            device_interface = get_interface_for_device(device_type)
-            if device_interface.is_available():
-                device_interface.synchronize()  # shake out any CUDA errors
-
+            # we can't postpone benchmarking if we need to verify the results
+            lazy = not VERIFY
+            result = choice.benchmark(*inpts, out=output, lazy=lazy)
             if VERIFY and autotune_args.expected is not None:
                 autotune_args.verify(**VERIFY)
             return result
@@ -2042,7 +2038,14 @@ class AlgorithmSelectorCache(PersistentCache):
 
                 timings[choice] = timing
 
-            return timings
+            # we want to convert all benchmark results into floats at this point,
+            # this will cause any lazy benchmarks to finalize (i.e. by executing
+            # a grouped benchmark).
+            finalized_timings: Dict[
+                Union[ExternKernelCaller, TritonTemplateCaller], float
+            ] = {choice: float(timing) for choice, timing in timings.items()}
+
+            return finalized_timings
 
         def benchmark_in_sub_process(
             choices: Union[List[ExternKernelCaller], List[TritonTemplateCaller]]
