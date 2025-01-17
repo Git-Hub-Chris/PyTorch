@@ -1293,6 +1293,7 @@ class TestPrologueFusion(TestCase):
             "benchmark_epilogue_fusion": True,
             "use_mixed_mm": False,
             "mixed_mm_choice": "default",
+            "max_epilogue_benchmarked_choices": 3,
         }
     )
     def test_pending_fusions_multiple(self):
@@ -1321,6 +1322,7 @@ class TestPrologueFusion(TestCase):
             "benchmark_epilogue_fusion": True,
             "use_mixed_mm": False,
             "mixed_mm_choice": "default",
+            "max_epilogue_benchmarked_choices": 3,
         }
     )
     def test_pending_fusion_pro_and_epi(self):
