@@ -188,6 +188,24 @@ class InPlaceCompilationTests(TestCase):
         with self.assertRaises(AttributeError):
             fn(x)
 
+    def test_compilation_nn_module_invalid_method(self):
+
+        class testModel(torch.nn.Module):
+            def __init__(self):
+                    super().__init__()
+
+            def forward(self, x):
+                    return self.does_not_exist(x)
+
+        @torch.compile()
+        def fn(m, x):
+            return m(x)
+
+        x = torch.randn(10, 10)
+        #with self.assertRaises(AttributeError):
+        fn(testModel(), x)
+
+
 
 # The private variants of the below functions are extensively tested
 # So as long as the signatures match we're good
