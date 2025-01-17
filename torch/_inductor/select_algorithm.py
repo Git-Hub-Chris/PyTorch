@@ -1402,7 +1402,9 @@ class ExternKernelCaller(ChoiceCaller):
             )
             out.copy_(out_new)  # for correctness checking
             if lazy:
-                timing = benchmarker.lazy_benchmark(algo, args, {})
+                timing = benchmarker.lazy_benchmark(
+                    algo, args, {}, pruning_key="max-autotune-gemm"
+                )
             else:
                 timing = benchmarker.benchmark(algo, args, {})
             return timing

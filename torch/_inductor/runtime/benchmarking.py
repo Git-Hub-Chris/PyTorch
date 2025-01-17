@@ -139,7 +139,7 @@ class Benchmarker:
         - rep: Optionally, the duration, in milliseconds, to run `_callable`
         during benchmarking.
         - kwargs: Any additional kwargs that may be passed, for example `ranking_key`
-        if the experimental benchmarker is disabled.
+        or `pruning_key` if the experimental benchmarker is disabled.
 
         Returns:
         - The median runtime of `_callable`, in milliseconds.
@@ -461,6 +461,9 @@ class GroupedInductorBenchmarker(InductorBenchmarker):
         benchmark_iters: int = 100,
         max_benchmark_duration: int = 25,
         ranking_key: Optional[str] = None,
+        pruning_key: Optional[str] = None,
+        pruning_factor: float = 1.1,
+        pruning_limit: int = 5,
         **kwargs: Any,
     ) -> List[float]:
         """Benchmark many GPU callables using a custom benchmarking implementation.
@@ -485,6 +488,15 @@ class GroupedInductorBenchmarker(InductorBenchmarker):
         the estimation loop instead of processing a full benchmarking cycle. The
         ranking key is set as a string, instead of a boolean, to ensure lazy benchmarks
         are properly grouped if ranking is enabled.
+        - pruning_key: Similar to `ranking_key` an optional string key that enables
+        pruning. Pruning eliminates slow callables after the stimation loop, and only
+        a subset of the fastest callables are fully benchmarked.
+        - pruning_factor: Cutoff for pruning callables. The runtime of the fastest
+        callable is multiplied by `pruning_factor` and only callables faster than this
+        new target time are allowed to pass through to the full benchmarking cycle.
+        - pruning_limit: Maximum number of callables that will be fully benchmarked
+        when pruning is enabled. For example, if `pruning_limit` is 1 only the fastest
+        callable will be fully benchmarked.
         - **kwargs: Additional kwargs that may be passed to the fallback.
 
         Returns:
@@ -521,15 +533,37 @@ class GroupedInductorBenchmarker(InductorBenchmarker):
             del buffer
             return estimated_timings
 
-        # adjust `benchmark_iters` to fit in the maximum benchmarking duration, we're
-        # alloted `max_benchmark_duration` per-callable, so we can just take the average
-        # of the estimated timings
-        benchmark_iters = max(
-            min(
-                benchmark_iters, int(max_benchmark_duration // mean(estimated_timings))
-            ),
-            1,
-        )
+        callable_to_timing = dict(zip(callables, estimated_timings))
+
+        if pruning_key is not None:
+            target_timing = min(estimated_timings) * pruning_factor
+            callables_to_benchmark = []
+            for _callable, timing_ms in sorted(
+                callable_to_timing.items(), key=lambda x: x[1]
+            ):
+                if timing_ms <= target_timing:
+                    callables_to_benchmark.append(_callable)
+                if len(callables_to_benchmark) == pruning_limit:
+                    break
+            # adjust `benchmark_iters` to fit in the maximum benchmarking duration,
+            # we're alloted `max_benchmark_duration` per-callable, and since we've
+            # pruned the callables we can assume the maximum duration of any callable
+            # is equivalent to `target_timing`
+            benchmark_iters = max(
+                min(benchmark_iters, int(max_benchmark_duration // target_timing)),
+                1,
+            )
+        else:
+            callables_to_benchmark = callables
+            # in the case that we haven't pruned the callables, we can take the average
+            # of the estimated timings to determine the appropriate number of iterations
+            benchmark_iters = max(
+                min(
+                    benchmark_iters,
+                    int(max_benchmark_duration // mean(estimated_timings)),
+                ),
+                1,
+            )
 
         # do the memory warmup
         for _ in range(memory_warmup_iters):
@@ -537,10 +571,12 @@ class GroupedInductorBenchmarker(InductorBenchmarker):
 
         # benchmark `_callable`
         interleaved_event_pairs = self.get_interleaved_event_pairs(
-            len(callables), benchmark_iters
+            len(callables_to_benchmark), benchmark_iters
         )
         for event_pairs in interleaved_event_pairs:
-            for _callable, (start_event, end_event) in zip(callables, event_pairs):
+            for _callable, (start_event, end_event) in zip(
+                callables_to_benchmark, event_pairs
+            ):
                 buffer.zero_()
                 start_event.record()
                 _callable()
@@ -556,12 +592,16 @@ class GroupedInductorBenchmarker(InductorBenchmarker):
 
         # return the minimum of estimated_timing and benchmarked_timing, since
         # we just want the minimum timing overall we might check both
-        return [
-            min(estimated_timing, benchmarked_timing)
-            for estimated_timing, benchmarked_timing in zip(
-                estimated_timings, benchmarked_timings
-            )
-        ]
+        callable_to_timing.update(
+            {
+                _callable: min(callable_to_timing[_callable], benchmarked_timing)
+                for _callable, benchmarked_timing in zip(
+                    callables_to_benchmark, benchmarked_timings
+                )
+            }
+        )
+
+        return [callable_to_timing[_callable] for _callable in callables]
 
 
 class LazyInductorBenchmarker(GroupedInductorBenchmarker):
@@ -606,6 +646,10 @@ class LazyInductorBenchmarker(GroupedInductorBenchmarker):
             # should be cached in memory, so we should return that cached timing
             if key in self.memory_cache:
                 return self.memory_cache[key]
+
+            print(self.memory_cache)
+            print(kwargs_hash)
+            print(self.kwargs_hash_to_futures_gpu)
 
             futures_gpu = self.kwargs_hash_to_futures_gpu.pop(kwargs_hash)
             callables, keys = zip(*futures_gpu)
