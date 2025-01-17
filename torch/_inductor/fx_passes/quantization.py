@@ -706,7 +706,8 @@ def _is_valid_quantized_op_binary_optimization_pattern(
             if "other" in match.kwargs
             else (
                 match.kwargs["accum"]
-                if output_dtype == torch.uint8 or (not extra_input_from_dequant)
+                if (output_dtype in OrderedSet([torch.uint8, torch.int8]))
+                or (not extra_input_from_dequant)
                 else match.kwargs["accum_after_dequant"]
             )
         )
@@ -1387,7 +1388,6 @@ def _is_valid_dequant_conv2d_pattern(dtype):
                 meta_value is None
                 or (meta_value.device.type != "cpu" and meta_value.device.type != "xpu")
                 or meta_value.dim() != 4
-                or (meta_value.device.type == "xpu" and match.kwargs["groups"] != 1)
             ):
                 # Only support conv2d now
                 # Grouped quantized convolution is not supported at XPU backend
