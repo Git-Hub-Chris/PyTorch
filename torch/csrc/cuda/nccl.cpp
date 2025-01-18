@@ -272,7 +272,10 @@ struct NcclCommList {
         static_cast<int>(devices.size()),
         devices.data()));
   }
+  NcclCommList(const NcclCommList& foo) = delete;
   NcclCommList(NcclCommList&& foo) = default;
+  NcclCommList& operator=(const NcclCommList& foo) = delete;
+  NcclCommList& operator=(NcclCommList&& foo) = default;
   // NOLINTNEXTLINE(bugprone-exception-escape)
   ~NcclCommList() {
     if (comms) {

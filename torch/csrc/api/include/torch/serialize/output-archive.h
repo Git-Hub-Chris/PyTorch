@@ -34,6 +34,7 @@ class TORCH_API OutputArchive final {
   // Copy is disallowed.
   OutputArchive(OutputArchive&) = delete;
   OutputArchive& operator=(OutputArchive&) = delete;
+  ~OutputArchive() = default;
 
   std::shared_ptr<jit::CompilationUnit> compilation_unit() const {
     return cu_;

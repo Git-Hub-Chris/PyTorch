@@ -81,6 +81,14 @@ struct CompiledAutogradThreadingDebugCheck {
   CompiledAutogradThreadingDebugCheck() {
     num_threads_in_backwards++;
   }
+  CompiledAutogradThreadingDebugCheck(
+      const CompiledAutogradThreadingDebugCheck&) = delete;
+  CompiledAutogradThreadingDebugCheck(CompiledAutogradThreadingDebugCheck&&) =
+      delete;
+  CompiledAutogradThreadingDebugCheck& operator=(
+      const CompiledAutogradThreadingDebugCheck&) = delete;
+  CompiledAutogradThreadingDebugCheck& operator=(
+      CompiledAutogradThreadingDebugCheck&&) = delete;
   ~CompiledAutogradThreadingDebugCheck() {
     release();
   }
@@ -262,6 +270,7 @@ auto ReadyQueue::pop() -> NodeTask {
   // Lock mutex for accesses to heap_
   std::unique_lock<std::mutex> lock(mutex_);
   not_empty_.wait(lock, [this] { return !heap_.empty(); });
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
   auto task = std::move(const_cast<NodeTask&>(heap_.top()));
   heap_.pop();
   return task;
@@ -869,7 +878,7 @@ void set_device(int device) {
 
 // Given an Edge or optional<InputMetdata>, return the InputMetadata
 template <typename T>
-const InputMetadata& get_input_metadata(const T& thing);
+static const InputMetadata& get_input_metadata(const T& thing);
 
 template <>
 const InputMetadata& get_input_metadata<std::optional<InputMetadata>>(
@@ -885,7 +894,7 @@ const InputMetadata& get_input_metadata<Edge>(const Edge& thing) {
 
 // Given an Edge or optional<InputMetdata>, return if there is an InputMetadata.
 template <typename T>
-bool has_input_metadata(const T& thing);
+static bool has_input_metadata(const T& thing);
 
 template <>
 bool has_input_metadata<std::optional<InputMetadata>>(
@@ -902,7 +911,7 @@ bool has_input_metadata<Edge>(const Edge& thing) {
 // outputs. This involves using the InputMetadata to check the outputs and also
 // potentially calling .sum_to on the outputs.
 template <typename T>
-void validate_outputs_impl(
+static void validate_outputs_impl(
     const std::vector<T>& input_metadata_container,
     variable_list& grads,
     const std::function<std::string(const std::string&)>& format_error) {
@@ -1450,7 +1459,7 @@ Engine& Engine::get_base_engine() {
   return engine;
 }
 
-std::atomic<EngineStub> engine_stub(Engine::get_base_engine);
+static std::atomic<EngineStub> engine_stub(Engine::get_base_engine);
 
 void set_default_engine_stub(EngineStub stub) {
   engine_stub.store(stub);

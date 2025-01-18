@@ -9,6 +9,8 @@ struct TORCH_API CustomBatchRequest {
   CustomBatchRequest() = default;
   CustomBatchRequest(const CustomBatchRequest&) = default;
   CustomBatchRequest(CustomBatchRequest&&) noexcept = default;
+  CustomBatchRequest& operator=(const CustomBatchRequest&) = default;
+  CustomBatchRequest& operator=(CustomBatchRequest&&) noexcept = default;
   virtual ~CustomBatchRequest() = default;
 
   /// The number of elements accessed by this index.

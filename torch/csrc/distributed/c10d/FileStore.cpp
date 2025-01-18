@@ -170,6 +170,10 @@ class File {
     }
     SYSASSERT(fd_, "open(" + path + ")");
   }
+  File(const File&) = delete;
+  File(File&&) = delete;
+  File& operator=(const File&) = delete;
+  File& operator=(File&&) = delete;
 
   ~File() {
     ::close(fd_);

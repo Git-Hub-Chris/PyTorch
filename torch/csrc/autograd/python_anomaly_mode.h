@@ -16,6 +16,11 @@ struct PyAnomalyMetadata : public AnomalyMetadata {
     // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
     dict_ = PyDict_New();
   }
+  PyAnomalyMetadata(const PyAnomalyMetadata&) = delete;
+  PyAnomalyMetadata(PyAnomalyMetadata&&) = delete;
+  PyAnomalyMetadata& operator=(const PyAnomalyMetadata&) = delete;
+  PyAnomalyMetadata& operator=(PyAnomalyMetadata&&) = delete;
+
   // NOLINTNEXTLINE(bugprone-exception-escape)
   ~PyAnomalyMetadata() override {
     // If python is already dead, leak the wrapped python objects

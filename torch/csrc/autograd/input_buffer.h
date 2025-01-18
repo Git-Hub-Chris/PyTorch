@@ -20,6 +20,8 @@ struct InputBuffer {
   InputBuffer(InputBuffer&& other) = default;
   explicit InputBuffer(variable_list&& inputs) : buffer(std::move(inputs)) {}
   InputBuffer& operator=(InputBuffer&& other) = default;
+  InputBuffer& operator=(const InputBuffer& other) = delete;
+  ~InputBuffer() = default;
 
   // Accumulates the variable at a specified index.
   // The optional CUDA streams determine which stream the accumulation

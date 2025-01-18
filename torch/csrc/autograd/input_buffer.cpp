@@ -87,6 +87,7 @@ bool can_accumulate_inplace(const Variable& v) {
 static void accumulate(
     std::vector<Variable>& buffer,
     const size_t pos,
+    // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param*)
     Variable&& var) {
   TORCH_INTERNAL_ASSERT(pos < buffer.size());
   auto& old_var = buffer[pos];
@@ -114,7 +115,8 @@ static void accumulate(
       // ATen doesn't route sparse additions correctly...
       old_var.is_sparse() || old_var.is_sparse_csr()) {
     if (can_accumulate_inplace(var)) {
-      buffer[pos] = var.add_(old_var);
+      var.add_(old_var);
+      buffer[pos] = std::move(var);
     } else {
       buffer[pos] = var + old_var;
     }
@@ -222,9 +224,9 @@ void InputBuffer::add(
   }
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param*)
 auto InputBuffer::variables(InputBuffer&& g) -> std::vector<Variable> {
-  std::vector<Variable> result = std::move(g.buffer);
-  return result;
+  return std::move(g.buffer);
 }
 
 } // namespace torch::autograd

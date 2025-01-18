@@ -174,6 +174,8 @@ class TORCH_API TensorPipeAgent : public RpcAgent {
 
   TensorPipeAgent(const TensorPipeAgent&) = delete;
   TensorPipeAgent& operator=(const TensorPipeAgent&) = delete;
+  TensorPipeAgent(TensorPipeAgent&&) = delete;
+  TensorPipeAgent& operator=(TensorPipeAgent&&) = delete;
 
   c10::intrusive_ptr<JitFuture> send(
       const WorkerInfo& to,
@@ -448,6 +450,10 @@ class TORCH_API TensorPipeAgent : public RpcAgent {
     }
 
     GroupMembershipLockGuard(const GroupMembershipLockGuard&) = delete;
+    GroupMembershipLockGuard(GroupMembershipLockGuard&&) = delete;
+    GroupMembershipLockGuard& operator=(const GroupMembershipLockGuard&) =
+        delete;
+    GroupMembershipLockGuard& operator=(GroupMembershipLockGuard&&) = delete;
 
    private:
     std::mutex& ref_;

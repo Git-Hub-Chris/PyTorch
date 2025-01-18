@@ -63,6 +63,10 @@ struct EnableTorchFunction {
     at::impl::PythonTorchFunctionTLS::set_disabled_state(
         at::impl::TorchFunctionDisabledState::ENABLED);
   }
+  EnableTorchFunction(const EnableTorchFunction&) = delete;
+  EnableTorchFunction(EnableTorchFunction&&) = delete;
+  EnableTorchFunction& operator=(const EnableTorchFunction&) = delete;
+  EnableTorchFunction& operator=(EnableTorchFunction&&) = delete;
   ~EnableTorchFunction() {
     at::impl::PythonTorchFunctionTLS::set_disabled_state(old_);
   }
@@ -73,6 +77,10 @@ struct EnablePythonDispatcher {
   EnablePythonDispatcher() : old_(c10::impl::PythonDispatcherTLS::get_state()) {
     c10::impl::PythonDispatcherTLS::set_state(getPyInterpreter());
   }
+  EnablePythonDispatcher(const EnablePythonDispatcher&) = delete;
+  EnablePythonDispatcher(EnablePythonDispatcher&&) = delete;
+  EnablePythonDispatcher& operator=(const EnablePythonDispatcher&) = delete;
+  EnablePythonDispatcher& operator=(EnablePythonDispatcher&&) = delete;
   ~EnablePythonDispatcher() {
     c10::impl::PythonDispatcherTLS::set_state(old_);
   }
