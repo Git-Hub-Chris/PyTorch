@@ -1253,6 +1253,15 @@ def _constrain_symbol_range(
     shape_env.constrain_symbol_range(s, compiler_min, compiler_max)
 
 
+def is_unbacked_symint(a: Union[SymInt, int]) -> bool:
+    return (
+        isinstance(a, SymInt)
+        and isinstance(a.node, SymNode)
+        and isinstance(a.node.expr, sympy.Symbol)
+        and a.node.shape_env.is_unbacked_symint(a.node.expr)
+    )
+
+
 def _advise_is_size(a: SymInt) -> None:
     """
     Don't use this directly; use torch._check_is_size instead.
