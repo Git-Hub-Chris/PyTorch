@@ -870,7 +870,6 @@ def lower_cpu(
             "torch.compile on current platform is not supported for CPU."
         )
 
-    fake_buffers: List[Buffer] = []  # noqa: F821
     placeholder_inps = [
         create_placeholder(name, dtype, query.get_device())
         for name, dtype in [
@@ -910,9 +909,7 @@ def lower_cpu(
         + mask_graph_placeholder_inps
         + list(mask_mod_other_buffers)
     )
-    for item in buffer_list:
-        if isinstance(item, TensorBox):
-            fake_buffers.append(item.data.data)  # type: ignore[attr-defined]
+    fake_buffers: List[Buffer] = [item.data.data for item in buffer_list if isinstance(item, TensorBox)]  # type: ignore[attr-defined]
 
     (
         query,
