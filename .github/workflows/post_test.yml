@@ -1,0 +1,13 @@
+name: Post Test Process
+on:
+  pull_request:
+
+jobs:
+  post-process:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: Testing
+        run: |
+          echo "Workflow: ${GITHUB_WORKFLOW}"
