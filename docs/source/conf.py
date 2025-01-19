@@ -79,9 +79,16 @@ panels_add_bootstrap_css = False
 # duplicated section names that are in different documents.
 autosectionlabel_prefix_document = True
 
+# Enable Sphinx parallel build
+
+parallel_write_safe = True
+parallel_read_safe = True
+numfig = True
+
 # katex options
 #
-#
+
+
 
 katex_prerender = True
 

@@ -51,7 +51,31 @@ echo "install_path: $install_path  version: $version"
 build_docs () {
   set +e
   set -o pipefail
-  make "$1" 2>&1 | tee /tmp/docs_build.txt
+  
+  echo "=== Build Start Time: $(date) ==="
+  
+  # Only rebuild files that changed since last commit
+  changed_files=$(git diff --name-only HEAD~1 HEAD | grep "docs/source.*\.rst$" || true)
+  if [ -n "$changed_files" ]; then
+    echo "Only rebuilding changed files: $changed_files"
+    SPHINXOPTS="-j auto -W --keep-going -n"
+    sphinx-build -b html \
+      ${SPHINXOPTS} \
+      --ignore-modified-after \
+      -d build/doctrees \
+      source \
+      build/html \
+      $changed_files 2>&1 | tee /tmp/docs_build.txt
+  else
+    echo "No RST files changed, doing full build"
+    SPHINXOPTS="-j auto -W --keep-going -n"
+    sphinx-build -b html \
+      ${SPHINXOPTS} \
+      -d build/doctrees \
+      source \
+      build/html 2>&1 | tee /tmp/docs_build.txt
+  fi
+  
   code=$?
   if [ $code -ne 0 ]; then
     set +x
@@ -63,10 +87,12 @@ build_docs () {
     echo "(tried to echo the WARNINGS above the ==== line)"
     echo =========================
   fi
+  
+  echo "=== Build End Time: $(date) ==="
+  
   set -ex -o pipefail
   return $code
 }
-
 
 git clone https://github.com/pytorch/docs pytorch_docs -b "$branch" --depth 1
 pushd pytorch_docs
