@@ -367,14 +367,14 @@ utility
         main()
 """  # noqa: E501
 
+import importlib.resources
+import logging
 import os
+import subprocess
 import sys
 import uuid
-import logging
-import subprocess
 from argparse import ArgumentParser, REMAINDER
 from importlib import metadata
-import importlib.resources
 from typing import Callable, Optional, Union
 
 import torch
@@ -624,7 +624,17 @@ def get_args_parser() -> ArgumentParser:
         action=env,
         type=str,
         default=None,
-        help="Mentioning the NUMA Binding Option to bind rank-processes to cpu-cores (Options: node, socket, core-complex, exclusive)",
+        help="""\
+        Mentioning the NUMA Binding Option to bind rank-processes to cpu-cores. 
+        Available options are:
+          - node: Processes are bound to cpu cores within a NUMA node.
+          - socket: Processes are bound to cpu cores within a socket.
+          - core-complex: Processes are bound to cpu cores in a core-complex.
+          - exclusive: Processes are bound to exclusive sets of cpu cores within a NUMA node.
+
+        Note:
+        1. This argument is only applicable when using GPUs.
+        2. The core-complex option might not achieve optimal performance on architectures featuring a single L3 cache per socket.""",
     )
     #
     # Positional arguments.
@@ -708,21 +718,24 @@ def determine_local_world_size(nproc_per_node: str):
         return num_proc
 
 
-def exit_with_error(command_to_print,exit_code=None):
+def exit_with_error(command_to_print, exit_code=None):
     print("*** torchrun error:{} ".format(command_to_print))
     if exit_code is not None:
         sys.exit(exit_code)
     else:
         sys.exit(1)
 
+
 def update_with_numa_binding_pytorch(binding_option):
     if binding_option is None:
         return ""
-    #Check if nvidia-smi is supported else fail
-    completedProc = subprocess.run("nvidia-smi &> /dev/null",shell=True)
+    # Check if nvidia-smi is supported else fail
+    completedProc = subprocess.run("nvidia-smi &> /dev/null", shell=True)
     if completedProc.returncode:
         exit_with_error("--binding option is only supported on NVIDIA GPUs")
-    numa_binding=importlib.resources.files("torch.distributed").joinpath("numa_binding.py")
+    numa_binding = importlib.resources.files("torch.distributed").joinpath(
+        "numa_binding.py"
+    )
     pycmd_binding = f"{numa_binding} --affinity {binding_option}"
     return pycmd_binding
 
