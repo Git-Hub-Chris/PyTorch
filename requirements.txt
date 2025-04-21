@@ -22,6 +22,11 @@ lintrunner ; platform_machine != "s390x"
 networkx
 optree>=0.13.0
 psutil
+pyyaml
+requests
+pynvml
+# issue on Windows after >= 75.8.2 - https://github.com/pytorch/pytorch/issues/148877
+setuptools<=75.8.2
 sympy>=1.13.3
 typing-extensions>=4.13.2
 wheel
