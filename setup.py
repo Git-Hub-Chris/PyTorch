@@ -1236,6 +1236,7 @@ def main() -> None:
         "networkx",
         "jinja2",
         "fsspec",
+        "pynvml>=11.4.1",
     ]
     if BUILD_PYTHON_ONLY:
         install_requires += [f"{LIBTORCH_PKG_NAME}=={TORCH_VERSION}"]
