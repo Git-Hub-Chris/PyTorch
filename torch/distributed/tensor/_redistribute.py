@@ -299,6 +299,8 @@ class Redistribute(torch.autograd.Function):
         ctx.backward_dtype = backward_dtype
         ctx.original_dtype = input._local_tensor.dtype
 
+        # TODO(whc) after rebase, the `and forward_dtype != input._local_tensor.dtype` showed up.
+        # is this a problem for simple_fsdp or can we just use what's on main
         if forward_dtype is not None and forward_dtype != input._local_tensor.dtype:
             local_tensor = input._local_tensor.to(dtype=forward_dtype)
             current_spec = DTensorSpec(
@@ -320,8 +322,6 @@ class Redistribute(torch.autograd.Function):
             target_spec = DTensorSpec(
                 device_mesh, placements, tensor_meta=current_spec.tensor_meta
             )
-
-            local_tensor = input._local_tensor
             output = redistribute_local_tensor(
                 local_tensor, current_spec, target_spec, async_op=async_op
             )
@@ -342,6 +342,9 @@ class Redistribute(torch.autograd.Function):
         async_op = ctx.async_op
         backward_dtype = ctx.backward_dtype or ctx.original_dtype
 
+
+        # TODO(whc) after rebase, the condition changed from != None to != grad_output.
+        # is this a problem for simple_fsdp or can we just use what's on main
         if backward_dtype != grad_output._local_tensor.dtype:
             local_tensor = grad_output._local_tensor.to(dtype=backward_dtype)
             current_spec = DTensorSpec(
@@ -385,6 +388,7 @@ class Redistribute(torch.autograd.Function):
         spec = DTensorSpec(
             previous_spec.device_mesh,
             tuple(normalized_placements),
+            # TODO(whc) after rebase, we create new TensorMeta instead of propagating previous_spec tensor_meta. is this ok?
             tensor_meta=TensorMeta(
                 shape=grad_output.shape,
                 stride=grad_output.stride(),
