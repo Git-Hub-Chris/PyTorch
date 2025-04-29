@@ -266,6 +266,13 @@ persistent_tma_mm_template = TritonTemplate(
         block_shape= [BLOCK_K, BLOCK_N] if B_ROW_MAJOR else [BLOCK_N, BLOCK_K],
     )
 
+    out_desc = tl.make_tensor_descriptor(
+        out_ptr0,
+        shape = [M, N],
+        strides = [N, 1],
+        block_shape = [BLOCK_M, BLOCK_N],
+    )
+
     pid_m = 0
     pid_n = 0
     rm = 0
@@ -301,15 +308,11 @@ persistent_tma_mm_template = TritonTemplate(
         )
 
         if ki == k_tiles - 1:
-            # rematerialize rm and rn to save registers
-            rcm = rm + tl.arange(0, BLOCK_M)
-            rcn = rn + tl.arange(0, BLOCK_N)
-            idx_m = rcm[:, None]
-            idx_n = rcn[None, :]
-            mask = (idx_m < M) & (idx_n < N)
+            # cast acc to output type for TMA store
+            out = acc.cast(A.dtype.element_ty)
 
             # inductor generates a suffix
-            {{store_output(("idx_m", "idx_n"), "acc", "mask", indent_width=12)}}
+            {{store_output(["rm", "rn"], "out", indent_width=12, mode = "TMA")}}
             acc = tl.zeros((BLOCK_M, BLOCK_N), dtype=ACC_TYPE)
 
 """,
