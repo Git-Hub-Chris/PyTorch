@@ -65,6 +65,7 @@ from torch.utils._sympy.symbol import SymT
 from . import config, dependencies
 from .codegen.common import (
     BackendFeature,
+    CodegenSymbol,
     get_scheduling_for_device,
     index_prevent_reordering,
 )
@@ -489,7 +490,7 @@ def try_match_insignificant_strides(
     return TensorBox(ReinterpretView(data=storage, layout=new_layout))
 
 
-class IRNode:
+class IRNode(CodegenSymbol):
     _current_origins: ClassVar[OrderedSet[Any]] = OrderedSet()
 
     # NB: These are kinda weird,
