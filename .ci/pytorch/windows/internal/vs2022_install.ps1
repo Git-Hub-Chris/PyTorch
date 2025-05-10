@@ -1,8 +1,8 @@
 # https://developercommunity.visualstudio.com/t/install-specific-version-of-vs-component/1142479
 # https://learn.microsoft.com/en-us/visualstudio/releases/2022/release-history#evergreen-bootstrappers
 
-# 17.4.3 BuildTools
-$VS_DOWNLOAD_LINK = "https://download.visualstudio.microsoft.com/download/pr/8f480125-28b8-4a2c-847c-c2b02a8cdd1b/64be21d4ada005d7d07896ed0b004c322409bd04d6e8eba4c03c9fa39c928e7a/vs_BuildTools.exe"
+# latest BuildTools
+$VS_DOWNLOAD_LINK = "https://aka.ms/vs/17/release/vs_BuildTools.exe"
 $COLLECT_DOWNLOAD_LINK = "https://aka.ms/vscollect.exe"
 $VS_INSTALL_ARGS = @("--nocache","--quiet","--wait", "--add Microsoft.VisualStudio.Workload.VCTools",
                                                      "--add Microsoft.Component.MSBuild",
@@ -20,9 +20,14 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+echo "VS download worked"
+
+echo $PATH
+
 if (Test-Path "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe") {
-    $existingPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -products "Microsoft.VisualStudio.Product.BuildTools" -version "[17, 18)" -property installationPath
-    if ($existingPath -ne $null) {
+    $existingPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -products "Microsoft.VisualStudio.Product.BuildTools" -version "[17.10, 18)" -property installationPath
+    Write-Output "Existing BuildTools installation found at: $existingPath"
+    if ($existingPath -ne $null -or $existingPath -ne "") {
         if (!${env:CIRCLECI}) {
             echo "Found correctly versioned existing BuildTools installation in $existingPath"
             exit 0
