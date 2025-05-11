@@ -1619,12 +1619,10 @@ if(USE_CUDA)
   endif()
   target_link_libraries(torch_cuda INTERFACE torch::cudart)
   target_link_libraries(torch_cuda PUBLIC c10_cuda)
-  if(TARGET torch::nvtx3)                    # modern path
-    target_link_libraries(torch_global_deps torch::nvtx3)
-  elseif(TARGET CUDA::nvtx3)                 # fallback for newer CUDA toolkits
-    target_link_libraries(torch_global_deps CUDA::nvtx3)
-  elseif(TARGET torch::nvtoolsext)           # legacy nvtoolsext
-    target_link_libraries(torch_global_deps torch::nvtoolsext)
+  if(TARGET torch::nvtx3)
+    target_link_libraries(torch_cuda PRIVATE torch::nvtx3)
+  else()
+    target_link_libraries(torch_cuda PUBLIC torch::nvtoolsext)
   endif()
 
   target_include_directories(
