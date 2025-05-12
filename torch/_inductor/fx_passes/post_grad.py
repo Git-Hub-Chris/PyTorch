@@ -173,10 +173,14 @@ def post_grad_passes(gm: torch.fx.GraphModule, is_inference: bool):
             )
         )
 
+    print(f"before post_grad_custom_post_pass: {gm.graph}")
+
     if post_grad_custom_post_pass := config.post_grad_custom_post_pass:
         GraphTransformObserver(gm, "post_grad_custom_post_pass").apply_graph_pass(
             post_grad_custom_post_pass
         )
+
+    print(f"after post_grad_custom_post_pass: {gm.graph}")
 
     GraphTransformObserver(gm, "stable_sort").apply_graph_pass(stable_topological_sort)
 

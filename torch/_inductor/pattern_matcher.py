@@ -2052,6 +2052,27 @@ def fx_to_pattern(
 
                 process_arg_fn = process_arg_fn_impl
 
+            if target is torch.ops.higher_order.auto_functionalized_v2:
+                kw_dict = {}
+
+                mutable_op = args[0]
+
+                for k, v in kwargs.items():
+                    if k == "_all_bases":
+                        kw_dict["_all_bases"] = v
+                    elif k.endswith("_base_index"):
+                        # literal int, must match exactly
+                        kw_dict[k] = v
+                    elif not k.endswith(("_size", "_stride", "_storage_offset")):
+                        # Non-view input args to the original mutable op
+                        # Capture it with Arg() if it is a node; keep
+                        # literal constants otherwise.
+                        kw_dict[k] = Arg() if isinstance(v, torch.fx.Node) else v
+                    else:
+                        continue
+
+                return CallFunction(target, mutable_op, **kw_dict)
+
             args, kwargs = pytree.tree_map(process_arg_fn, (args, kwargs))
             if list in ignore_types:
                 # Handle a burned in tensor size which are now [Ignored(), Ignored(), ...]
@@ -2074,7 +2095,9 @@ def fx_to_pattern(
     assert isinstance(gm, torch.fx.GraphModule)
     pattern = Converter(gm).run()
     if not isinstance(pattern, PatternExpr):
+        print(f"here1: pattern: {pattern}")
         return MultiOutputPattern(pytree.tree_leaves(pattern))
+    print(f"here2: pattern: {pattern}")
     return pattern
 
 
@@ -2097,12 +2120,17 @@ def fwd_only(
         if apply_auto_functionalize:
             fn = dispatch_functionalize(fn)
         gm = make_fx(fn, decompositions, tracing_mode="real")(*args)
+        if apply_auto_functionalize:
+            print(f"before DCE: pattern: {gm.graph}")
 
     from .fx_passes.post_grad import remove_noop_ops
 
     if run_functional_passes:
         remove_noop_ops(gm.graph)
         gm.graph.eliminate_dead_code()
+
+    if apply_auto_functionalize:
+        print(f"after DCE: pattern: {gm.graph}")
 
     gm.recompile()
     return gm
