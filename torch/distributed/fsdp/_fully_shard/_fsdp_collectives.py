@@ -4,7 +4,7 @@ from typing import Callable, cast, NamedTuple, Optional, Union
 import torch
 import torch.distributed as dist
 from torch.distributed.device_mesh import _get_device_handle
-from torch.distributed.distributed_c10d import ReduceOp
+from torch.distributed.distributed_c10d import ReduceOp, Work
 from torch.distributed.tensor import DTensor
 
 from ._fsdp_common import (
@@ -12,9 +12,15 @@ from ._fsdp_common import (
     _raise_assert_with_print,
     _to_dtype_if_needed,
     compiled_autograd_enabled,
+    _USE_SM_MULTIMEM_ALL_GATHER_OUT,
+    _USE_SM_ALL_GATHER_DIRECT,
+    _USE_SM_LOW_CONTENTION_ALL_GATHER,
 )
 from ._fsdp_param import FSDPParam, ShardedState
+import torch.distributed._symmetric_memory as symm_mem
+from torch._C._distributed_c10d import _SymmetricMemory
 
+_skip_register = set()
 
 class AllGatherResult(NamedTuple):
     all_gather_output: torch.Tensor
@@ -83,12 +89,13 @@ def all_gather_copy_in_cuda(
     all_gather_output = torch.empty(
         (all_gather_input_numel * world_size,), dtype=dtype, device=device
     )
+
     all_gather_input = all_gather_output.narrow(
         0, all_gather_input_numel * rank, all_gather_input_numel
     )
     foreach_copy_dsts = torch.split(all_gather_input, inp_split_sizes)
     with torch.no_grad():
-        torch._foreach_copy_(foreach_copy_dsts, all_gather_inputs)
+        torch._foreach_copy_(foreach_copy_dsts, all_gather_inputs, non_blocking=True)
     return all_gather_input, all_gather_output
 
 
@@ -147,48 +154,190 @@ def foreach_all_gather(
 ) -> Optional[AllGatherResult]:
     world_size, rank = group.size(), group.rank()
     device_handle = _get_device_handle(device.type)
-    with device_handle.stream(all_gather_copy_in_stream):
-        param_all_gather_inputs = _get_param_all_gather_inputs(fsdp_params)
-        (
-            param_all_gather_input_dtypes,
-            param_all_gather_input_numels,
-            dtype,
-        ) = _get_all_gather_input_metadatas(param_all_gather_inputs)
-        if dtype == torch.uint8:
-            all_gather_inputs = [
-                t.view(torch.uint8) for ts in param_all_gather_inputs for t in ts
-            ]
-        else:
-            all_gather_inputs = [*chain.from_iterable(param_all_gather_inputs)]
-        inp_split_sizes = [t.numel() for t in all_gather_inputs]
-        all_gather_input_numel = sum(inp_split_sizes)
-        all_gather_input, all_gather_output = torch.ops.fsdp.all_gather_copy_in(
-            all_gather_inputs,
-            inp_split_sizes,
-            all_gather_input_numel,
-            world_size,
-            rank,
-            dtype,
-            device,
-        )
-        del param_all_gather_inputs
-    all_gather_stream.wait_stream(all_gather_copy_in_stream)
-    with device_handle.stream(all_gather_stream):
-        all_gather_work = dist.all_gather_into_tensor(
-            output_tensor=all_gather_output,
-            input_tensor=all_gather_input,
-            group=group,
-            async_op=async_op,
-        )
+
+    if _USE_SM_ALL_GATHER_DIRECT:
+        with device_handle.stream(all_gather_copy_in_stream):
+            # TODO: XXX Find proper place to register process group.
+            group_name = group.name()
+            if group_name not in _skip_register:
+                try:
+                    torch._C._distributed_c10d._register_process_group(group_name, group)
+                except RuntimeError as e:
+                    # Ignore for now
+                    _skip_register.add(group_name)
+
+            param_all_gather_inputs = _get_param_all_gather_inputs(fsdp_params)
+            (
+                param_all_gather_input_dtypes,
+                param_all_gather_input_numels,
+                dtype,
+            ) = _get_all_gather_input_metadatas(param_all_gather_inputs)
+            if dtype == torch.uint8:
+                all_gather_inputs = [
+                    t.view(torch.uint8) for ts in param_all_gather_inputs for t in ts
+                ]
+            else:
+                all_gather_inputs = [*chain.from_iterable(param_all_gather_inputs)]
+
+            inp_split_sizes = [t.numel() for t in all_gather_inputs]
+
+            # XXX Allocate multimem ouptut wourld_numel
+            # XXX Each rank copies its part directly
+            all_gather_input_numel = sum(inp_split_sizes)
+            rank_numel = all_gather_input_numel
+            world_numel = rank_numel * world_size
+            hdl = symm_mem.get_symm_mem_workspace(group.name(), world_numel * dtype.itemsize)
+            all_gather_output = hdl.get_buffer(
+                group.rank(),
+                (world_numel,),
+                dtype,
+            )
+            mc_all_gather_output = torch.ops.symm_mem.get_multicast_buffer(all_gather_output, group.name())
+            all_gather_input = mc_all_gather_output.narrow(
+                0, rank_numel * rank, rank_numel
+            )
+            with torch.no_grad():
+                 foreach_copy_dsts = torch.split(all_gather_input, inp_split_sizes)
+                 torch._foreach_copy_(foreach_copy_dsts, all_gather_inputs, non_blocking=True)
+            del param_all_gather_inputs
+        all_gather_stream.wait_stream(all_gather_copy_in_stream)
+        all_gather_work = None
         all_gather_event = all_gather_stream.record_event()
-        return AllGatherResult(
-            all_gather_output,
-            all_gather_event,
-            all_gather_work,
-            param_all_gather_input_dtypes,
-            param_all_gather_input_numels,
-            inp_split_sizes,
-        )
+    elif _USE_SM_MULTIMEM_ALL_GATHER_OUT:
+        with device_handle.stream(all_gather_copy_in_stream):
+            # TODO: XXX Find proper place to register process group.
+            if group.name() not in _skip_register:
+                try:
+                    torch._C._distributed_c10d._register_process_group(group.name(), group)
+                except RuntimeError as e:
+                    # Ignore for now
+                    _skip_register.add(group.name())
+
+            param_all_gather_inputs = _get_param_all_gather_inputs(fsdp_params)
+            (
+                param_all_gather_input_dtypes,
+                param_all_gather_input_numels,
+                dtype,
+            ) = _get_all_gather_input_metadatas(param_all_gather_inputs)
+            if dtype == torch.uint8:
+                all_gather_inputs = [
+                    t.view(torch.uint8) for ts in param_all_gather_inputs for t in ts
+                ]
+            else:
+                all_gather_inputs = [*chain.from_iterable(param_all_gather_inputs)]
+            inp_split_sizes = [t.numel() for t in all_gather_inputs]
+            all_gather_input_numel = sum(inp_split_sizes)
+            rank_numel = all_gather_input_numel
+            world_numel = rank_numel * world_size
+            hdl = symm_mem.get_symm_mem_workspace(group.name(), world_numel * dtype.itemsize)
+            all_gather_output = hdl.get_buffer(
+                group.rank(),
+                (world_numel,),
+                dtype,
+            )
+            all_gather_input = all_gather_output.narrow(0, rank_numel * rank, rank_numel)
+            with torch.no_grad():
+                 foreach_copy_dsts = torch.split(all_gather_input, inp_split_sizes)
+                 torch._foreach_copy_(foreach_copy_dsts, all_gather_inputs, non_blocking=True)
+            del param_all_gather_inputs
+        all_gather_stream.wait_stream(all_gather_copy_in_stream)
+        with device_handle.stream(all_gather_stream):
+            torch.ops.symm_mem.multimem_all_gather_out(
+                all_gather_input,
+                group.name(),
+                all_gather_output
+            )
+            all_gather_work = None
+            all_gather_event = all_gather_stream.record_event()
+    elif _USE_SM_LOW_CONTENTION_ALL_GATHER:
+        with device_handle.stream(all_gather_copy_in_stream):
+            # TODO: XXX Find proper place to register process group.
+            if group.name() not in _skip_register:
+                try:
+                    torch._C._distributed_c10d._register_process_group(group.name(), group)
+                except RuntimeError as e:
+                    # Ignore for now
+                    _skip_register.add(group.name())
+
+            # XXX cpu -> cuda when offload_to_cpu
+            param_all_gather_inputs = _get_param_all_gather_inputs(fsdp_params)
+            (
+                param_all_gather_input_dtypes,
+                param_all_gather_input_numels,
+                dtype,
+            ) = _get_all_gather_input_metadatas(param_all_gather_inputs)
+            if dtype == torch.uint8:
+                all_gather_inputs = [
+                    t.view(torch.uint8) for ts in param_all_gather_inputs for t in ts
+                ]
+            else:
+                all_gather_inputs = [*chain.from_iterable(param_all_gather_inputs)]
+            inp_split_sizes = [t.numel() for t in all_gather_inputs]
+            all_gather_input_numel = sum(inp_split_sizes)
+            rank_numel = all_gather_input_numel
+            world_numel = rank_numel * world_size
+            hdl = symm_mem.get_symm_mem_workspace(group.name(), rank_numel * dtype.itemsize)
+            all_gather_input = hdl.get_buffer(
+                hdl.rank,
+                (rank_numel,),
+                dtype,
+            )
+            with torch.no_grad():
+                 foreach_copy_dsts = torch.split(all_gather_input, inp_split_sizes)
+                 torch._foreach_copy_(foreach_copy_dsts, all_gather_inputs, non_blocking=True)
+            del param_all_gather_inputs
+        all_gather_stream.wait_stream(all_gather_copy_in_stream)
+        with device_handle.stream(all_gather_stream):
+            all_gather_output = torch.ops.symm_mem._low_contention_all_gather(
+                all_gather_input,
+                group.name(),
+            )
+            all_gather_work = None
+            all_gather_event = all_gather_stream.record_event()
+    else:
+        with device_handle.stream(all_gather_copy_in_stream):
+            # XXX cpu -> cuda when offload_to_cpu
+            param_all_gather_inputs = _get_param_all_gather_inputs(fsdp_params)
+            (
+                param_all_gather_input_dtypes,
+                param_all_gather_input_numels,
+                dtype,
+            ) = _get_all_gather_input_metadatas(param_all_gather_inputs)
+            if dtype == torch.uint8:
+                all_gather_inputs = [
+                    t.view(torch.uint8) for ts in param_all_gather_inputs for t in ts
+                ]
+            else:
+                all_gather_inputs = [*chain.from_iterable(param_all_gather_inputs)]
+            inp_split_sizes = [t.numel() for t in all_gather_inputs]
+            all_gather_input_numel = sum(inp_split_sizes)
+            all_gather_input, all_gather_output = torch.ops.fsdp.all_gather_copy_in(
+                all_gather_inputs,
+                inp_split_sizes,
+                all_gather_input_numel,
+                world_size,
+                rank,
+                dtype,
+                device,
+            )
+            del param_all_gather_inputs
+        all_gather_stream.wait_stream(all_gather_copy_in_stream)
+        with device_handle.stream(all_gather_stream):
+            all_gather_work = dist.all_gather_into_tensor(
+                output_tensor=all_gather_output,
+                input_tensor=all_gather_input,
+                group=group,
+                async_op=async_op,
+            )
+            all_gather_event = all_gather_stream.record_event()
+    return AllGatherResult(
+        all_gather_output,
+        all_gather_event,
+        all_gather_work,
+        param_all_gather_input_dtypes,
+        param_all_gather_input_numels,
+        inp_split_sizes,
+    )
 
 
 @torch.no_grad()
@@ -196,6 +345,8 @@ def _get_param_all_gather_inputs(
     fsdp_params: list[FSDPParam],
 ) -> list[list[torch.Tensor]]:
     if compiled_autograd_enabled():
+        return [fsdp_param.all_gather_inputs for fsdp_param in fsdp_params]
+    if _USE_SM_ALL_GATHER_DIRECT:
         return [fsdp_param.all_gather_inputs for fsdp_param in fsdp_params]
 
     # Intentionally try to run a fast-path that bypasses abstractions for the
@@ -226,6 +377,7 @@ def _get_param_all_gather_inputs(
             foreach_copy_inputs.append(all_gather_input)
             foreach_copy_input_numels.append(all_gather_input.numel())
         else:
+            # XXX This will call FSDPParam.all_gather_inputs cpu -> cuda
             param_all_gather_inputs[i] = fsdp_param.all_gather_inputs
 
     # 2nd pass: use foreach copy to compute the remaining all-gather inputs
@@ -239,6 +391,7 @@ def _get_param_all_gather_inputs(
         torch._foreach_copy_(splits, foreach_copy_inputs)
         for i, split in zip(foreach_copy_indices, splits):
             param_all_gather_inputs[i] = [split]
+
 
     return param_all_gather_inputs
 
