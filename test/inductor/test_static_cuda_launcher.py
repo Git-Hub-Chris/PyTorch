@@ -287,6 +287,35 @@ class TestStaticCudaLauncher(TestCase):
         launcher.run(1, 1, 1, stream)
 
     @skipIfRocm
+    def test_multi_cta(self):
+        if torch.cuda.get_device_capability() < (9, 0):
+            self.skipTest(
+                "Requires compute capability >= 9 for NV",
+            )
+
+        @triton.jit
+        def kernel_multi_cta(ptrs, BLOCK_SIZE: tl.constexpr):
+            numel = 512
+            offset = tl.program_id(0) * BLOCK_SIZE
+            index = offset
+            mask = index < numel
+            a = tl.load(ptrs, mask=mask)
+            tl.store(ptrs, a)
+
+        block_size = 128
+        data = torch.zeros((128,), device="cuda", dtype=torch.float32)
+        compiled_kernel = kernel_multi_cta[(2,)](
+            data, BLOCK_SIZE=block_size, num_ctas=4
+        )
+        launcher = self._make_launcher(compiled_kernel)
+        device_interface = get_interface_for_device("cuda")
+        stream = device_interface.get_raw_stream(device_interface.current_device())
+
+        data2 = torch.zeros((128,), device="cuda", dtype=torch.float32)
+        launcher.run(2, 1, 1, stream, data2)
+        self.assertEqual(data, data2)
+
+    @skipIfRocm
     def test_high_shared_mem(self):
         @triton.jit
         def simple_kernel(arg0, arg1):
