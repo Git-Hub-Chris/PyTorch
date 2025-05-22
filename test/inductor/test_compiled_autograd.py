@@ -16,6 +16,7 @@ from copy import deepcopy
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 from string import Template
+from typing import Optional
 from unittest import mock
 
 import torch
@@ -4246,7 +4247,7 @@ def lookup_backend(test_name):
         return "inductor"
 
 
-def wrap_test_class(orig_cls):
+def wrap_test_class(orig_cls, method_name: Optional[str] = None):
     dct = orig_cls.__dict__.copy()
     for name in list(dct.keys()):
         fn = dct[name]
@@ -4258,7 +4259,9 @@ def wrap_test_class(orig_cls):
             or name in xfail_divergence_from_eager
         ):
             dct[name] = unittest.expectedFailure
-        elif name.startswith("test_"):
+        elif name.startswith("test_") and not method_name:
+            # if name == "test_GQA_causal_mask_cuda":
+            #     breakpoint()
             backend = lookup_backend(name)
             if not HAS_CUDA and backend == "inductor":
                 continue
@@ -4272,6 +4275,9 @@ def wrap_test_class(orig_cls):
                 test_contexts.get(name, contextlib.nullcontext()),
             ]
             dct[name] = make_wrapped(fn, ctxs)
+
+    if method_name:
+        dct[method_name] = lambda self: compiled_autograd._enable(make_compiler_fn(fullgraph=False))
 
     cls = type(
         orig_cls.__name__ + "WithCompiledAutograd",
@@ -4495,12 +4501,16 @@ if IS_S390X:
 
 test_autograd = load_test_module("test_autograd")
 test_custom_ops = load_test_module("test_custom_ops")
+test_flex_attention = load_test_module("inductor/test_flex_attention")
 
 TestAutogradWithCompiledAutograd = wrap_test_class(test_autograd.TestAutograd)
 TestNestedCheckpointWithCompiledAutograd = wrap_test_class(
     test_autograd.TestNestedCheckpoint
 )
 TestCustomOpWithCompiledAutograd = wrap_test_class(test_custom_ops.TestCustomOp)
+TestFlexAttentionCUDAWithCompiledAutograd = wrap_test_class(
+    test_flex_attention.TestFlexAttentionCUDA, "_maybe_compiled_autograd_ctx"
+)
 if torch.distributed.is_available() and HAS_CUDA:
     test_dtensor = load_test_module("distributed/tensor/test_dtensor_compile")
     TestDTensorCompileWithCompiledAutograd = wrap_test_class(
