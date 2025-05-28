@@ -433,7 +433,7 @@ def is_known_channels_last_contiguous(a: Tensor) -> bool:
     ) or is_known_channels_last_contiguous_3d(a)
 
 
-def is_non_overlapping_and_dense(a: Tensor) -> bool:
+def is_non_overlapping_and_dense(a: Tensor, false_if_dde=False) -> bool:
     """
     True when a tensor is non-overlapping and dense.
 
@@ -447,7 +447,7 @@ def is_non_overlapping_and_dense(a: Tensor) -> bool:
         return False
 
     # Short-circuits if the tensor is already contiguous or channels-last contiguous
-    if is_contiguous(a) or is_channels_last_contiguous(a):
+    if is_contiguous(a, false_if_dde) or is_channels_last_contiguous(a, false_if_dde):
         return True
 
     # The following is equivalent to compute_non_overlapping_and_dense in TensorImpl.cpp
@@ -1922,10 +1922,13 @@ def check(
 
 # This combines is_channels_last_strides_2d and is_channels_last_strides_3d in
 # c10/core/MemoryFormat.h into one function
-def are_strides_like_channels_last(
+# its ok if this return non-accurate results with unbacked, but we try to 
+# suggest things as accurate as possible. It can return True, 
+# when the actual results are false.
+def suggest_strides_like_channels_last(
     shape: Sequence[int], strides: Sequence[int]
 ) -> bool:
-    from torch.fx.experimental.symbolic_shapes import guard_size_oblivious
+    from torch.fx.experimental.symbolic_shapes import guard_or_false, guard_or_true
 
     ndim = len(shape)
 
@@ -1938,19 +1941,23 @@ def are_strides_like_channels_last(
     else:
         return False
 
-    if guard_size_oblivious(strides[1] == 0):
+    if guard_or_false(strides[1] == 0):
         return False
 
     min = 0
     for d in dim_order:
-        if guard_size_oblivious(shape[d] == 0):
+        if guard_or_false(shape[d] == 0):
             return False
-        if guard_size_oblivious(strides[d] < min):
+        if guard_or_false(strides[d] < min):
             return False
         if d == 0 and min == strides[1]:
             return False
         min = strides[d]
-        if guard_size_oblivious(strides[d] > 1):
+         # we assume strides[d] is not 0 or 1 here, this is consistent with previous  
+        # guard_size_oblivious, I am not sure why it's ok though.. do we want that or do    
+        # we want. double check why is this ok
+
+        if guard_or_true(strides[d] > 1):
             min *= shape[d]
     return True
 
@@ -1959,7 +1966,7 @@ def suggest_memory_format(x: TensorLikeType) -> torch.memory_format:
     if x.layout != torch.strided:
         return torch.contiguous_format
 
-    if are_strides_like_channels_last(x.shape, x.stride()):
+    if suggest_strides_like_channels_last(x.shape, x.stride()):
         return torch.channels_last if x.ndim == 4 else torch.channels_last_3d
 
     return torch.contiguous_format
