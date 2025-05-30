@@ -3830,6 +3830,18 @@ def forward(self, x):
             str(ep_for_real.range_constraints.values()),
         )
 
+    def test_unbacked_where(self):
+        class Where(torch.nn.Module):
+            def forward(self, xs):
+                u0, u1, u2 = xs.tolist()
+                a = torch.rand(1, u0 + u1, 1, dtype=torch.bool)
+                b = torch.empty(1, u2 + 4, 100)
+                return torch.where(a, b, torch.zeros_like(b))
+
+        x = torch.tensor([5, 6, 7])
+        ep = export(Where(), (x,))
+        ep.module()(x)
+
     def test_export_for_training_with_container_type(self):
         class Foo(torch.nn.Module):
             def __init__(self) -> None:
