@@ -108,6 +108,8 @@ jobs:
     if: ${{ always() && github.repository_owner == 'pytorch' }}
     runs-on: ubuntu-latest
     continue-on-error: true
+    permissions:
+      contents: read
     steps:
       - name: Get our GITHUB_TOKEN API limit usage
         env:
