@@ -4,6 +4,10 @@ on:
   repository_dispatch:
     types: [try-rebase]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   do_rebase:
     runs-on: ubuntu-20.04
