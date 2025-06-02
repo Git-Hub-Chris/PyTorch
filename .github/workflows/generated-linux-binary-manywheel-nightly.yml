@@ -2629,6 +2629,8 @@ jobs:
 
   manywheel-py3_13-cpu-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     uses: ./.github/workflows/_binary-build-linux.yml
     needs: get-label-type
     with:
