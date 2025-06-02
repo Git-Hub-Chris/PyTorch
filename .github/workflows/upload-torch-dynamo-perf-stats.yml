@@ -9,6 +9,8 @@ on:
 jobs:
   get-conclusion:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       conclusion: ${{ fromJson(steps.get-conclusion.outputs.data).conclusion }}
     steps:
