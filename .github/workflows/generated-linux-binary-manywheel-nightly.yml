@@ -3410,6 +3410,8 @@ jobs:
       github-token: ${{ secrets.GITHUB_TOKEN }}
   manywheel-py3_13t-cuda11_8-test:  # Testing
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     needs:
       - manywheel-py3_13t-cuda11_8-build
       - get-label-type
