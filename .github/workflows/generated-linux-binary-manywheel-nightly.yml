@@ -2989,6 +2989,8 @@ jobs:
       - manywheel-py3_13-rocm6_2_4-build
       - get-label-type
     runs-on: linux.rocm.gpu
+    permissions:
+      contents: read
     timeout-minutes: 240
     env:
       PYTORCH_ROOT: /pytorch
