@@ -1,5 +1,8 @@
 name: Upload test stats while running
 
+permissions:
+  contents: read
+
 on:
   schedule:
     # Every hour
