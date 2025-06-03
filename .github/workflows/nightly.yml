@@ -31,6 +31,8 @@ jobs:
 
   docs-build:
     name: docs build
+    permissions:
+      contents: read
     uses: ./.github/workflows/_linux-build.yml
     needs: get-label-type
     with:
