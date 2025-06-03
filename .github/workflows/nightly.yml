@@ -19,6 +19,8 @@ concurrency:
 jobs:
   get-label-type:
     name: get-label-type
+    permissions:
+      contents: read
     uses: pytorch/pytorch/.github/workflows/_runner-determinator.yml@main
     if: ${{ (github.event_name != 'schedule' || github.repository == 'pytorch/pytorch') && github.repository_owner == 'pytorch' }}
     with:
