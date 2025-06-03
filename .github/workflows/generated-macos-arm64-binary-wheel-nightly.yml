@@ -380,6 +380,8 @@ jobs:
     uses: ./.github/workflows/_binary-upload.yml
   wheel-py3_12-cpu-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     runs-on: macos-14-xlarge
     timeout-minutes: 240
     env:
