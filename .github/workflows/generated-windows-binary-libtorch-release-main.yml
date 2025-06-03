@@ -4,6 +4,9 @@
 # Generation script: .github/scripts/generate_ci_workflows.py
 name: windows-binary-libtorch-release
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
