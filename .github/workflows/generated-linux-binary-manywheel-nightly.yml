@@ -1582,6 +1582,8 @@ jobs:
 
   manywheel-py3_11-cuda12_4-full-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     uses: ./.github/workflows/_binary-build-linux.yml
     needs: get-label-type
     with:
