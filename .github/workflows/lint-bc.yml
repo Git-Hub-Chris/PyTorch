@@ -1,5 +1,8 @@
 name: BC Lint
 
+permissions:
+  contents: read
+
 on:
   pull_request:
     types:
