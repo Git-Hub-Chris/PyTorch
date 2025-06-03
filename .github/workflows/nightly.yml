@@ -41,6 +41,8 @@ jobs:
 
   docs-push:
     name: docs push
+    permissions:
+      contents: write
     uses: ./.github/workflows/_docs.yml
     needs:
       - docs-build
