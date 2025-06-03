@@ -762,13 +762,14 @@ jobs:
       github-token: ${{ secrets.GITHUB_TOKEN }}
   manywheel-py3_10-cpu-cxx11-abi-test:  # Testing
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     needs:
       - manywheel-py3_10-cpu-cxx11-abi-build
       - get-label-type
     uses: ./.github/workflows/_binary-test-linux.yml
     with:
       PYTORCH_ROOT: /pytorch
-      PACKAGE_TYPE: manywheel
       # TODO: This is a legacy variable that we eventually want to get rid of in
       #       favor of GPU_ARCH_VERSION
       DESIRED_CUDA: cpu-cxx11-abi
