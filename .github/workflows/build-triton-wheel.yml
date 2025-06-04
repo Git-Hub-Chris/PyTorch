@@ -39,6 +39,8 @@ jobs:
 
   build-wheel:
     name: "Build Triton Wheel"
+    permissions:
+      contents: read
     needs: get-label-type
     runs-on: "${{ needs.get-label-type.outputs.label-type }}linux.4xlarge"
     strategy:
