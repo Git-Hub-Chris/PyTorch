@@ -4,6 +4,11 @@
 
 name: xpu-test
 
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
 on:
   workflow_call:
     inputs:
