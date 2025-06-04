@@ -1,5 +1,10 @@
 name: linux-build
 
+permissions:
+  contents: read
+  actions: read
+  statuses: write
+
 on:
   workflow_call:
     inputs:
