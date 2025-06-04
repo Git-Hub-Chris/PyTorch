@@ -303,6 +303,8 @@ jobs:
 
   libtorch-rocm6_2_4-shared-with-deps-cxx11-abi-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     uses: ./.github/workflows/_binary-build-linux.yml
     needs: get-label-type
     with:
