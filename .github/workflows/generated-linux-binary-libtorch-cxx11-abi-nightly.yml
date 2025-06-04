@@ -261,6 +261,8 @@ jobs:
     needs:
       - libtorch-cuda12_6-shared-with-deps-cxx11-abi-build
       - get-label-type
+    permissions:
+      contents: read
     uses: ./.github/workflows/_binary-test-linux.yml
     with:
       PYTORCH_ROOT: /pytorch
