@@ -57,6 +57,10 @@ static auto& lib = MetalShaderLibrary::getBundledLibrary();
 #include <ATen/native/mps/Indexing_metallib.h>
 #endif
 
+// WARNING: If any tensors in the iterator are COW and they are materialized
+// after this function call, the output of this function becomes invalid.
+// Always either materialize beforehand by calling `mutable_data_ptr` or avoid
+// materializing with `const_data_ptr`.
 id<MTLBuffer> generateKernelDataOffsets(id<MTLComputeCommandEncoder> commandEncoder,
                                         const TensorIteratorBase& iter,
                                         bool use_64bit_index) {
@@ -154,17 +158,23 @@ static bool dispatchIndexKernel(TensorIteratorBase& iter,
       uint64_t* indexABContents = (uint64_t*)(indexAB.contents);
       for (uint32_t idx = 0; idx < num_indices; idx++) {
         const Tensor& indexTensor = iter.tensor(idx + 2);
-        indexABContents[idx] =
-            getMTLBufferStorage(indexTensor).gpuAddress + (indexTensor.storage_offset() * indexTensor.element_size());
+        auto indexBuffer = ConstMTLBufferTensor(indexTensor).mtl_buffer_unsafe();
+        indexABContents[idx] = indexBuffer.gpuAddress + (indexTensor.storage_offset() * indexTensor.element_size());
         TORCH_CHECK(indexTensor.scalar_type() == ScalarType::Long, "index(): Expected dtype int64 for Index");
-        [computeEncoder useResource:getMTLBufferStorage(indexTensor) usage:MTLResourceUsageRead];
+        [computeEncoder useResource:indexBuffer usage:MTLResourceUsageRead];
       }
       // this function call is a no-op if MPS Profiler is not enabled
       getMPSProfiler().beginProfileKernel(indexSelectPSO, indexFunction, {inputTensor});
 
       [computeEncoder setComputePipelineState:indexSelectPSO];
-      mtl_setArgs(
-          computeEncoder, indexAB, index_size, index_stride, kernelDataOffsets, inputTensor, outputTensor, num_indices);
+      mtl_setArgs(computeEncoder,
+                  indexAB,
+                  index_size,
+                  index_stride,
+                  kernelDataOffsets,
+                  ConstMTLBufferTensor(inputTensor).mtl_buffer_unsafe(),
+                  outputTensor,
+                  num_indices);
       MTLSize gridSize = MTLSizeMake(numThreads, 1, 1);
       if (serial_index_put) {
         mtl_setBytes(computeEncoder, numIters, 7);
