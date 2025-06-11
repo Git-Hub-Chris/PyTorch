@@ -35,7 +35,9 @@ struct TORCH_API HIPHooksInterface : AcceleratorHooksInterface {
     return -1;
   }
 
-  bool isPinnedPtr(const void* /*data*/ ) const override {
+  C10_DEPRECATED_MESSAGE(
+    "getHIPHooks().isPinnedPtr(...) is deprecated. Please use at::getHostAllocator(at::kHIP)->is_pinned(...) instead.")
+  bool isPinnedPtr(const void* /*data*/) const override {
     return false;
   }
 
