@@ -116,6 +116,7 @@ void CUDAHooks::init() const {
   if (set_lazy_module_loading) {
     c10::utils::set_env("CUDA_MODULE_LOADING", "LAZY", false);
   }
+  at::getHostAllocator(at::kCUDA)->init();
   const auto num_devices = c10::cuda::device_count_ensure_non_zero();
   c10::cuda::CUDACachingAllocator::init(num_devices);
   at::cuda::detail::init_p2p_access_cache(num_devices);
@@ -139,36 +140,7 @@ Device CUDAHooks::getDeviceFromPtr(void* data) const {
 }
 
 bool CUDAHooks::isPinnedPtr(const void* data) const {
-  // First check if driver is broken/missing, in which case PyTorch CPU
-  // functionalities should still work, we should report `false` here.
-  if (!at::cuda::is_available()) {
-    return false;
-  }
-  // cudaPointerGetAttributes grabs context on the current device, so we set
-  // device to one that already has context, if exists.
-  at::OptionalDeviceGuard device_guard;
-  auto primary_ctx_device_index = getDeviceIndexWithPrimaryContext();
-  if (primary_ctx_device_index.has_value()) {
-    device_guard.reset_device(at::Device(at::DeviceType::CUDA, *primary_ctx_device_index));
-  }
-  cudaPointerAttributes attr{};
-  // We do not believe that CUDA needs mutable access to the data
-  // here.
-  cudaError_t err = cudaPointerGetAttributes(&attr, data);
-#if !defined(USE_ROCM)
-  if (err == cudaErrorInvalidValue) {
-    (void)cudaGetLastError(); // clear CUDA error
-    return false;
-  }
-  AT_CUDA_CHECK(err);
-#else
-  // HIP throws hipErrorUnknown here
-  if (err != cudaSuccess) {
-    (void)cudaGetLastError(); // clear HIP error
-    return false;
-  }
-#endif
-  return attr.type == cudaMemoryTypeHost;
+  return at::getHostAllocator(at::kCUDA)->is_pinned(data);
 }
 
 bool CUDAHooks::hasCUDA() const {
