@@ -1303,6 +1303,7 @@ class CrossEntropyLoss(_WeightedLoss):
         >>> # Provided target class probabilities do not sum to 1
         >>> target.sum(axis=1)
         tensor([-0.8146,  0.8914, -0.0774])
+        >>> # No error message and possible misleading loss value
         >>> loss(input, target).item()
         -0.10109150409698486
 
@@ -1317,8 +1318,8 @@ class CrossEntropyLoss(_WeightedLoss):
         >>> # New target class probabilities sum to 1
         >>> target_new.sum(axis=1)
         tensor([1.0000, 1.0000, 1.0000])
-        >>> loss(input, target).item()
-        -0.10109150409698486
+        >>> loss(input, target_new).item()
+        2.048427104949951
     """
     __constants__ = ["ignore_index", "reduction", "label_smoothing"]
     ignore_index: int
