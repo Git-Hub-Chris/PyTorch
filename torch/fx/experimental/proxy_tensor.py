@@ -207,8 +207,6 @@ def set_proxy_slot(
 ) -> None:
     log.debug("set_proxy_slot %s (%s) %s", obj, id(obj), proxy)
     if isinstance(obj, Tensor):
-        # We DO want to clobber proxies whenever we run an inplace operation
-        # on a tensor, and it affects the metadata on the proxy.
         assert isinstance(proxy, _ProxyTensor)
         tracer.tensor_tracker[obj] = proxy
     elif isinstance(obj, (_AnyScriptObject)):
@@ -982,7 +980,8 @@ def proxy_call(
     else:
         constant = None
 
-    track_tensor_tree(out, proxy_out, constant=constant, tracer=tracer)
+    if not func._schema.is_mutable:
+        track_tensor_tree(out, proxy_out, constant=constant, tracer=tracer)
     _maybe_record_pointwise_barrier(func, proxy_mode)
     return out
 
