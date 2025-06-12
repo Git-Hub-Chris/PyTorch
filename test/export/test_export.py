@@ -4978,7 +4978,6 @@ def forward(self, p_linear_weight, p_linear_bias, b_buffer, x):
         # There should be nonzero view nodes in the graph
         self.assertTrue(view_count > 0)
 
-    @testing.expectedFailureCppSerDes  # cpp ser/der not handling complicated symbols
     def test_solver_unsupported_sympy_function(self):
         # repro of https://github.com/pytorch/pytorch/issues/131897
 
@@ -14173,6 +14172,20 @@ def forward(self, x):
         self.assertEqual(num_asserts, 2)
         with self.assertRaises(RuntimeError):
             ep.module()(torch.randn(4, 2))
+
+    def test_unbacked_strides_like_channel_last(self):
+        class Foo(torch.nn.Module):
+            def forward(self, x):
+                n = x.item() // 2240
+                y = torch.empty(1, n, 20, 112)
+                return y[:, :, :20, :].reshape(n, -1, 112)
+
+        mod = Foo()
+        x = torch.tensor([4480])
+        ep = export(mod, (x,))
+        self.assertEqual(mod(x).shape, ep.module()(x).shape)
+        x = torch.tensor([2240])
+        self.assertEqual(mod(x).shape, ep.module()(x).shape)
 
     @testing.expectedFailureSerDer  # T195866111
     @testing.expectedFailureSerDerNonStrict
