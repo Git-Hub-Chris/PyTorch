@@ -1,5 +1,5 @@
 # This script parses args, installs required libraries (MKL, Magma, libuv)
-# and then delegates to cpu.bat, cuda126.bat, etc.
+# and then delegates to cpu.ps1, cuda126.ps1, etc.
 
 param(
     [string]$CudaVersion,
@@ -154,12 +154,8 @@ foreach ($pythonVersion in $pythonVersions) {
     }
 
     Write-Host "Calling arch build script"
-    $buildScript = "$CUDA_PREFIX.bat"
-    & .\$buildScript
-
-    if ($LASTEXITCODE -ne 0) {
-        exit 1
-    }
+    $buildScript = "$CUDA_PREFIX.ps1"
+    . .\$buildScript
 }
 
 $env:PATH = $ORIG_PATH
