@@ -359,8 +359,8 @@ def forward(self, x_1):
 
 def forward(self, x_1):
     zeros = torch.ops.aten.zeros.default([2], dtype = torch.float32, device = device(type='cpu'), pin_memory = False)
-    copy_ = torch.ops.aten.copy_.default(zeros, x_1);  zeros = x_1 = None
-    return copy_
+    _ = torch.ops.aten.copy_.default(zeros, x_1);  x_1 = _ = None
+    return zeros
     """)
 
     def test_make_fx_reentrant_dispatch(self):
@@ -508,11 +508,12 @@ def forward(self, x_1):
             return y
 
         traced = make_fx(f, tracing_mode=self.tracing_mode)(torch.randn(3, requires_grad=True))
+
         self.assertEqual([
             tuple(node.meta['val'].shape)
             for node in traced.graph.nodes
             if 'val' in node.meta
-        ], [(3,), (3,), (1, 3)])
+        ], [(3,), (1, 3)])
 
     def test_make_fx_overloads(self):
         def f(x):
@@ -1427,7 +1428,7 @@ def forward(self, images_1, handedness_1, valid_1):
     eq = torch.ops.aten.eq.Scalar(index_1, 1);  index_1 = None
     index_2 = torch.ops.aten.index.Tensor(index, [eq])
     flip = torch.ops.aten.flip.default(index_2, [-1]);  index_2 = None
-    index_put_ = torch.ops.aten.index_put_.default(index, [eq], flip);  index = eq = flip = index_put_ = None
+    _ = torch.ops.aten.index_put_.default(index, [eq], flip);  index = eq = flip = _ = None
     return None""")
 
     def test_neg_shape(self):

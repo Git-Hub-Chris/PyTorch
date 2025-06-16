@@ -4917,7 +4917,7 @@ def forward(self, x_1) -> torch.Tensor:
     add = torch.ops.aten.add.Tensor(view, ones);  view = ones = None
     view_1 = torch.ops.aten.view.default(add, [4, 2]);  add = None
     view_2 = torch.ops.aten.view.default(view_1, [4, 2]);  view_2 = None
-    copy_ = torch.ops.aten.copy_.default(x_1, view_1);  x_1 = copy_ = None
+    _ = torch.ops.aten.copy_.default(x_1, view_1);  x_1 = _ = None
     return view_1
     """,
         )
@@ -5005,8 +5005,8 @@ def forward(self, a_1, b_1) -> torch.Tensor:
 def forward(self, x_1):
     resize = torch.ops.aten.resize.default(x_1, [10])
     fill = torch.ops.aten.fill.Scalar(resize, 2);  resize = None
-    resize_ = torch.ops.aten.resize_.default(x_1, [10]);  x_1 = None
-    copy_ = torch.ops.aten.copy_.default(resize_, fill);  resize_ = fill = copy_ = None
+    _ = torch.ops.aten.resize_.default(x_1, [10]);  _ = None
+    __1 = torch.ops.aten.copy_.default(x_1, fill);  x_1 = fill = __1 = None
     return None
     """,
         )
