@@ -6,7 +6,8 @@ from typing import Any
 import sympy
 
 import torch
-from torch._inductor.select_algorithm import realize_inputs, SymbolicGridFn
+from torch._inductor.codegen.triton_templates.common import SymbolicGridFn
+from torch._inductor.select_algorithm import realize_inputs
 from torch._inductor.utils import sympy_product
 from torch._inductor.virtualized import V
 
