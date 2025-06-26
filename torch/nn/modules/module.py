@@ -2399,6 +2399,11 @@ class Module:
         )
         local_state = {k: v for k, v in local_name_params if v is not None}
         assign_to_params_buffers = local_metadata.get("assign_to_params_buffers", False)
+        # Check that value of strict has not changed (e.g. via subclasses overriding _load_from_state_dict)
+        initial_strict = local_metadata.get("initial_strict", None)
+        if initial_strict is not None and initial_strict is strict:
+            strict = True
+
         use_swap_tensors = torch.__future__.get_swap_module_params_on_conversion()
 
         for name, param in local_state.items():
@@ -2570,13 +2575,16 @@ class Module:
 
         def load(module, local_state_dict, prefix=""):
             local_metadata = {} if metadata is None else metadata.get(prefix[:-1], {})
+            # Propagate strict correctly to load_state_dict pre-hooks but make sure
+            # missing and unexpected keys are populated by _load_from_state_dict
+            local_metadata["initial_strict"] = strict
             if assign:
                 local_metadata["assign_to_params_buffers"] = assign
             module._load_from_state_dict(
                 local_state_dict,
                 prefix,
                 local_metadata,
-                True,
+                strict,
                 missing_keys,
                 unexpected_keys,
                 error_msgs,
