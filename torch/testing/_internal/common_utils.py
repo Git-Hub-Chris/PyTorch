@@ -1593,12 +1593,10 @@ if TEST_WITH_TORCHDYNAMO:
     torch._dynamo.config.log_compilation_metrics = False
     # Silence 3.13.0 guard performance warnings
     torch._dynamo.config.issue_3_13_0_warning = False
+    torch._dynamo.config.compiled_autograd = True
     if TEST_WITH_TORCHINDUCTOR:
         import torch._inductor.config
         torch._inductor.config.fallback_random = True
-    else:
-        # only dynamo for now
-        torch._dynamo.config.compiled_autograd = not TEST_WITHOUT_COMPILED_AUTOGRAD
 
 
 # seems like this is only used in test/torch_np
@@ -3325,17 +3323,22 @@ class TestCase(expecttest.TestCase):
 
                 if TEST_WITH_TORCHINDUCTOR:
                     subdir = "test/inductor_skips"
-                    from .dynamo_test_failures import inductor_skips as skips
+                    from .dynamo_test_failures import (
+                        inductor_skips as skips,
+                        compiled_autograd_inductor_skips as compiled_autograd_skips
+                    )
                 else:
                     subdir = "test/dynamo_skips"
-                    from .dynamo_test_failures import dynamo_skips as skips
+                    from .dynamo_test_failures import (
+                        dynamo_skips as skips,
+                        compiled_autograd_dynamo_skips as compiled_autograd_skips
+                    )
 
                 if key in skips:
                     method = getattr(self, self._testMethodName)
                     file_name = os.path.join(subdir, key)
                     setattr(self, self._testMethodName, ignore_failure(method, file_name))
 
-                from .dynamo_test_failures import compiled_autograd_skips
                 if torch._dynamo.config.compiled_autograd and key in compiled_autograd_skips:
                     # Still run the test, but with compiled autograd disabled
                     super_run = runWithoutCompiledAutograd()(super_run)
