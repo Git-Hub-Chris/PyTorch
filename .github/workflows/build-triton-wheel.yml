@@ -30,6 +30,8 @@ jobs:
   get-label-type:
     if: github.repository_owner == 'pytorch'
     name: get-label-type
+    permissions:
+      contents: read
     uses: pytorch/pytorch/.github/workflows/_runner-determinator.yml@main
     with:
       triggering_actor: ${{ github.triggering_actor }}
@@ -39,6 +41,8 @@ jobs:
 
   build-wheel:
     name: "Build Triton Wheel"
+    permissions:
+      contents: read
     needs: get-label-type
     runs-on: "${{ needs.get-label-type.outputs.label-type }}linux.4xlarge"
     strategy:
