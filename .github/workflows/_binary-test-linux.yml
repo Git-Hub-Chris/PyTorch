@@ -1,4 +1,6 @@
 name: linux-binary-test
+permissions:
+  contents: read
 
 on:
   workflow_call:

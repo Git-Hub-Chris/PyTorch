@@ -1,5 +1,11 @@
 name: build docs
 
+permissions:
+  contents: read
+  packages: read
+  actions: read
+  id-token: write
+
 on:
   workflow_call:
     inputs:
