@@ -4,6 +4,8 @@
 # Generation script: .github/scripts/generate_ci_workflows.py
 name: linux-binary-manywheel
 
+permissions:
+  contents: read
 
 on:
   push:
@@ -314,6 +316,8 @@ jobs:
 
   manywheel-py3_9-cuda12_6-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     uses: ./.github/workflows/_binary-build-linux.yml
     needs: get-label-type
     with:
@@ -336,6 +340,8 @@ jobs:
       github-token: ${{ secrets.GITHUB_TOKEN }}
   manywheel-py3_9-cuda12_6-test:  # Testing
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     needs:
       - manywheel-py3_9-cuda12_6-build
       - get-label-type
@@ -478,6 +484,8 @@ jobs:
 
   manywheel-py3_9-rocm6_3-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     uses: ./.github/workflows/_binary-build-linux.yml
     needs: get-label-type
     with:
@@ -675,6 +683,8 @@ jobs:
 
   manywheel-py3_10-cpu-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     uses: ./.github/workflows/_binary-build-linux.yml
     needs: get-label-type
     with:
@@ -760,13 +770,14 @@ jobs:
       github-token: ${{ secrets.GITHUB_TOKEN }}
   manywheel-py3_10-cpu-cxx11-abi-test:  # Testing
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     needs:
       - manywheel-py3_10-cpu-cxx11-abi-build
       - get-label-type
     uses: ./.github/workflows/_binary-test-linux.yml
     with:
       PYTORCH_ROOT: /pytorch
-      PACKAGE_TYPE: manywheel
       # TODO: This is a legacy variable that we eventually want to get rid of in
       #       favor of GPU_ARCH_VERSION
       DESIRED_CUDA: cpu-cxx11-abi
@@ -805,6 +816,8 @@ jobs:
 
   manywheel-py3_10-cuda11_8-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     uses: ./.github/workflows/_binary-build-linux.yml
     needs: get-label-type
     with:
@@ -874,6 +887,8 @@ jobs:
 
   manywheel-py3_10-cuda12_4-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     uses: ./.github/workflows/_binary-build-linux.yml
     needs: get-label-type
     with:
@@ -896,6 +911,8 @@ jobs:
       github-token: ${{ secrets.GITHUB_TOKEN }}
   manywheel-py3_10-cuda12_4-test:  # Testing
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     needs:
       - manywheel-py3_10-cuda12_4-build
       - get-label-type
@@ -1012,6 +1029,8 @@ jobs:
 
   manywheel-py3_10-rocm6_2_4-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     uses: ./.github/workflows/_binary-build-linux.yml
     needs: get-label-type
     with:
@@ -1033,6 +1052,8 @@ jobs:
       github-token: ${{ secrets.GITHUB_TOKEN }}
   manywheel-py3_10-rocm6_2_4-test:  # Testing
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     needs:
       - manywheel-py3_10-rocm6_2_4-build
       - get-label-type
@@ -1371,6 +1392,8 @@ jobs:
 
   manywheel-py3_11-cpu-cxx11-abi-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     uses: ./.github/workflows/_binary-build-linux.yml
     needs: get-label-type
     with:

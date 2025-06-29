@@ -26,6 +26,10 @@ on:
         description: |
           A JSON description of what configs to run later on.
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   filter:
     if: github.repository_owner == 'pytorch'
