@@ -200,7 +200,7 @@ class PartialRender:
         self.replacement_hooks[hook_key] = self.FINALIZED_HOOK
 
     def finalize_remaining(
-        self, excluding: Optional[list[str]] = None
+        self, excluding: Optional[Union[list[str], str]] = None
     ) -> Optional[str]:
         """
         Finalize the remaining active hooks except those in `excluding` if
@@ -211,6 +211,8 @@ class PartialRender:
         finalize active hooks.
         """
         if excluding:
+            if isinstance(excluding, str):
+                excluding = [excluding]
             assert all(key in self.replacement_hooks for key in excluding), (
                 f"{excluding=} must be a subset of {self.replacement_hooks=}"
             )
