@@ -4,6 +4,11 @@
 # Generation script: .github/scripts/generate_ci_workflows.py
 name: windows-binary-libtorch-debug
 
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
 on:
   push:
     branches:

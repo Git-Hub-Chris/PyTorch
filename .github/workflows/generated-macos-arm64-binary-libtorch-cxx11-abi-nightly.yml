@@ -3,6 +3,8 @@
 # Template is at:    .github/templates/macos_binary_build_workflow.yml.j2
 # Generation script: .github/scripts/generate_ci_workflows.py
 name: macos-arm64-binary-libtorch-cxx11-abi
+permissions:
+  contents: read
 
 on:
 # TODO: Migrate to new ciflow trigger, reference https://github.com/pytorch/pytorch/pull/70321

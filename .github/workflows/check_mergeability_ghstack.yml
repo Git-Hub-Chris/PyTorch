@@ -5,6 +5,9 @@ on:
     types: [opened, synchronize, reopened]
     branches: [gh/**/base]
 
+permissions:
+  contents: read
+
 jobs:
   ghstack-mergeability-check:
     if: github.repository_owner == 'pytorch'
