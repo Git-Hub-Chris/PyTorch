@@ -1,5 +1,8 @@
 name: Build manywheel docker images for s390x
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   push:
