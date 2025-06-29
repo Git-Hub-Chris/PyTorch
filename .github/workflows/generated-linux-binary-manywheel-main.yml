@@ -4,6 +4,8 @@
 # Generation script: .github/scripts/generate_ci_workflows.py
 name: linux-binary-manywheel
 
+permissions:
+  contents: read
 
 on:
   push:

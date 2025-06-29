@@ -1,5 +1,11 @@
 name: linux-test
 
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+  packages: read
+
 on:
   workflow_call:
     inputs:
