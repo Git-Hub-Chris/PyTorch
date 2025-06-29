@@ -1,5 +1,12 @@
 name: mac-test
 
+permissions:
+  contents: read
+  actions: read
+  issues: write
+  pull-requests: write
+  packages: read
+
 on:
   workflow_call:
     inputs:
