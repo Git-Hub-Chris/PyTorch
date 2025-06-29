@@ -4,6 +4,9 @@
 # Generation script: .github/scripts/generate_ci_workflows.py
 name: windows-binary-libtorch-release
 
+permissions:
+  contents: read
+
 on:
   push:
     # NOTE: Meta Employees can trigger new nightlies using: https://fburl.com/trigger_pytorch_nightly_build
@@ -154,6 +157,8 @@ jobs:
           .github\scripts\kill_active_ssh_sessions.ps1
   libtorch-cpu-shared-with-deps-release-test:  # Testing
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     needs:
       - libtorch-cpu-shared-with-deps-release-build
       - get-label-type
@@ -537,6 +542,8 @@ jobs:
     uses: ./.github/workflows/_binary-upload.yml
   libtorch-cuda12_4-shared-with-deps-release-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     needs: get-label-type
     runs-on: "${{ needs.get-label-type.outputs.label-type }}windows.4xlarge"
     timeout-minutes: 240
@@ -650,6 +657,9 @@ jobs:
           .github\scripts\kill_active_ssh_sessions.ps1
   libtorch-cuda12_4-shared-with-deps-release-test:  # Testing
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
+      actions: read
     needs:
       - libtorch-cuda12_4-shared-with-deps-release-build
       - get-label-type
@@ -786,6 +796,8 @@ jobs:
     uses: ./.github/workflows/_binary-upload.yml
   libtorch-cuda12_6-shared-with-deps-release-build:
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     needs: get-label-type
     runs-on: "${{ needs.get-label-type.outputs.label-type }}windows.4xlarge"
     timeout-minutes: 240
@@ -899,6 +911,8 @@ jobs:
           .github\scripts\kill_active_ssh_sessions.ps1
   libtorch-cuda12_6-shared-with-deps-release-test:  # Testing
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     needs:
       - libtorch-cuda12_6-shared-with-deps-release-build
       - get-label-type

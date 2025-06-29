@@ -1,5 +1,11 @@
 name: windows-build
 
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+  issues: write
+
 on:
   workflow_call:
     inputs:
