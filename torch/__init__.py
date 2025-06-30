@@ -33,7 +33,7 @@ from typing import (
     Union as _Union,
 )
 from typing_extensions import ParamSpec as _ParamSpec
-packaging
+import packaging
 
 
 if TYPE_CHECKING:
@@ -170,14 +170,16 @@ else:
     _rocm_init.initialize()
     del _rocm_init
 
-from torch.version import cuda as cuda_version
+cuda_version = None
+if hasattr(torch, "version"):
+    from torch.torch_version import TorchVersion
+    cuda_version = TorchVersion(getattr(torch.version, "cuda", "0.0"))
 
 
 if sys.platform == "win32":
 
     def _load_dll_libraries() -> None:
         import sysconfig
-
 
         pfiles_path = os.getenv("ProgramFiles", r"C:\Program Files")
         py_dll_path = os.path.join(sys.exec_prefix, "Library", "bin")
@@ -2351,12 +2353,6 @@ class _TorchCompileInductorWrapper:
         self.apply_mode(mode)
         self.apply_options(options)
         self.apply_options(CompilerBisector.get_config_change("inductor"))
-
-        cuda_version = None
-        if hasattr(torch, "version"):
-            from torch.torch_version import TorchVersion
-
-            cuda_version = TorchVersion(getattr(torch.version, "cuda", "0.0"))
 
         if self.config.get("triton.cudagraphs", False) and (
             (cuda_version and cuda_version < "12.6")
