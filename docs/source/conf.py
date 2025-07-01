@@ -3253,7 +3253,7 @@ coverage_ignore_classes = [
     # torch.storage
     "UntypedStorage",
     # torch.torch_version
-    "TorchVersion",
+    "VersionString",
     # torch.types
     "SymInt",
     # torch.utils.benchmark.examples.compare
