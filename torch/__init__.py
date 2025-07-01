@@ -170,10 +170,8 @@ else:
     _rocm_init.initialize()
     del _rocm_init
 
-cuda_version = None
-if hasattr(torch, "version"):
-    from torch.torch_version import TorchVersion
-    cuda_version = TorchVersion(getattr(torch.version, "cuda", "0.0"))
+
+from torch.version import cuda as cuda_version_str
 
 
 if sys.platform == "win32":
@@ -224,13 +222,13 @@ if sys.platform == "win32":
         else:
             nvtoolsext_dll_path = ""
 
-        if cuda_version and builtins.all(
+        if cuda_version_str and builtins.all(
             not glob.glob(os.path.join(p, "cudart64*.dll")) for p in dll_paths
         ):
-            cuda_version_1 = cuda_version.replace(".", "_")
+            cuda_version_1 = cuda_version_str.replace(".", "_")
             cuda_path_var = "CUDA_PATH_V" + cuda_version_1
             default_path = os.path.join(
-                pfiles_path, "NVIDIA GPU Computing Toolkit", "CUDA", f"v{cuda_version}"
+                pfiles_path, "NVIDIA GPU Computing Toolkit", "CUDA", f"v{cuda_version_str}"
             )
             cuda_path = os.path.join(os.getenv(cuda_path_var, default_path), "bin")
         else:
@@ -366,29 +364,48 @@ def _load_global_deps() -> None:
     except OSError as err:
         # Can only happen for wheel with cuda libs as PYPI deps
         # As PyTorch is not purelib, but nvidia-*-cu12 is.
-        # 2 patterns defined for each lib - first is specific,
-        # second is generic backup.
-        cuda_maj = int(cuda_version.split(".")[0])
-        cuda_libs: Dict[str, Union[str, List[str]] ] = {
-            "cublas": [f"libcublas.so.{cuda_maj}*", "libcublas.so.[0-9]"],
-            "cudnn": [f"libcudnn.so.{cuda_maj-3}*", "libcudnn.so.*[0-9]"],
-            "cuda_nvrtc": [f"libnvrtc.so.{cuda_maj}*", "libnvrtc.so.*[0-9]"],
-            "cuda_runtime": [f"libcudart.so.{cuda_maj}*","libcudart.so.*[0-9]"],
-            "cuda_cupti": [f"libcupti.so.{cuda_maj}*","libcupti.so.*[0-9]"],
-            "cufft": [f"libcufft.so.{cuda_maj-1}*", "libcufft.so.*[0-9]"],
-            "curand": [f"libcurand.so.{cuda_maj-2}*", "libcurand.so.*[0-9]"],
-            "cusparse": [f"libcusparse.so.{cuda_maj}*", "libcusparse.so.*[0-9]"],
-            "cusparselt": [f"libcusparseLt.so.{cuda_maj}*", "libcusparseLt.so.*[0-9]"],
-            "cusolver": [f"libcusolver.so.{cuda_maj-1}", "libcusolver.so.*[0-9]"],
-            "nvjitlink": "libnvJitLink.so.*[0-9]",
-            "nccl": "libnccl.so.*[0-9]",
-            "nvtx": "libnvToolsExt.so.*[0-9]",
-            "nvshmem": "libnvshmem_host.so.*[0-9]",
-        }
+
+        if cuda_version_str is not None:
+            # 2 patterns defined for each lib - first is specific,
+            # second is generic backup.
+            cuda_maj = int(cuda_version_str.split(".")[0])
+            cuda_libs: Dict[str, Union[str, List[str]] ] = {
+                "cublas": [f"libcublas.so.{cuda_maj}*", "libcublas.so.[0-9]"],
+                "cudnn": [f"libcudnn.so.{cuda_maj-3}*", "libcudnn.so.*[0-9]"],
+                "cuda_nvrtc": [f"libnvrtc.so.{cuda_maj}*", "libnvrtc.so.*[0-9]"],
+                "cuda_runtime": [f"libcudart.so.{cuda_maj}*","libcudart.so.*[0-9]"],
+                "cuda_cupti": [f"libcupti.so.{cuda_maj}*","libcupti.so.*[0-9]"],
+                "cufft": [f"libcufft.so.{cuda_maj-1}*", "libcufft.so.*[0-9]"],
+                "curand": [f"libcurand.so.{cuda_maj-2}*", "libcurand.so.*[0-9]"],
+                "cusparse": [f"libcusparse.so.{cuda_maj}*", "libcusparse.so.*[0-9]"],
+                "cusparselt": [f"libcusparseLt.so.{cuda_maj}*", "libcusparseLt.so.*[0-9]"],
+                "cusolver": [f"libcusolver.so.{cuda_maj-1}", "libcusolver.so.*[0-9]"],
+                "nvjitlink": "libnvJitLink.so.*[0-9]",
+                "nccl": "libnccl.so.*[0-9]",
+                "nvtx": "libnvToolsExt.so.*[0-9]",
+                "nvshmem": "libnvshmem_host.so.*[0-9]",
+            }
+        else:
+            cuda_libs: dict[str, str] = {
+                "cublas": "libcublas.so.*[0-9]",
+                "cudnn": "libcudnn.so.*[0-9]",
+                "cuda_nvrtc": "libnvrtc.so.*[0-9]",
+                "cuda_runtime": "libcudart.so.*[0-9]",
+                "cuda_cupti": "libcupti.so.*[0-9]",
+                "cufft": "libcufft.so.*[0-9]",
+                "curand": "libcurand.so.*[0-9]",
+                "nvjitlink": "libnvJitLink.so.*[0-9]",
+                "cusparse": "libcusparse.so.*[0-9]",
+                "cusparselt": "libcusparseLt.so.*[0-9]",
+                "cusolver": "libcusolver.so.*[0-9]",
+                "nccl": "libnccl.so.*[0-9]",
+                "nvtx": "libnvToolsExt.so.*[0-9]",
+                "nvshmem": "libnvshmem_host.so.*[0-9]",
+            }
         # cufiile is only available on cuda 12+
         # TODO: Remove once CUDA 11.8 binaries are deprecated
-        if cuda_version is not None:
-            t_version = cuda_version.split(".")
+        if cuda_version_str is not None:
+            t_version = cuda_version_str.split(".")
             t_major = int(t_version[0])  # type: ignore[operator]
             if t_major >= 12:
                 cuda_libs["cufile"] = "libcufile.so.*[0-9]"
@@ -2353,6 +2370,12 @@ class _TorchCompileInductorWrapper:
         self.apply_mode(mode)
         self.apply_options(options)
         self.apply_options(CompilerBisector.get_config_change("inductor"))
+
+        cuda_version = None
+        if hasattr(torch, "version"):
+            from torch.torch_version import TorchVersion
+
+            cuda_version = TorchVersion(getattr(torch.version, "cuda", "0.0"))
 
         if self.config.get("triton.cudagraphs", False) and (
             (cuda_version and cuda_version < "12.6")
