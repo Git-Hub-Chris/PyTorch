@@ -585,6 +585,9 @@ class SideEffects:
         self.id_to_variable = {
             k: v for k, v in self.id_to_variable.items() if is_live(v)
         }
+        self.keepalive = [
+            obj for obj in self.keepalive if id(obj) in self.id_to_variable
+        ]
         self.store_attr_mutations = {
             k: v for k, v in self.store_attr_mutations.items() if is_live(k)
         }
