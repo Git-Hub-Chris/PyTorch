@@ -366,7 +366,7 @@ def _load_global_deps() -> None:
     except OSError as err:
         # Can only happen for wheel with cuda libs as PYPI deps
         # As PyTorch is not purelib, but nvidia-*-cu12 is.
-        # 2 patterns defined for each lib - first is specific, 
+        # 2 patterns defined for each lib - first is specific,
         # second is generic backup.
         cuda_maj = int(cuda_version.split(".")[0])
         cuda_libs: Dict[str, Union[str, List[str]] ] = {
