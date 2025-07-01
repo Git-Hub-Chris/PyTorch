@@ -2430,6 +2430,7 @@ class TritonKernel(SIMDKernel[TritonCSEVariable]):
         reduction_type: ReductionType,
         value: Union[CSEVariable, tuple[CSEVariable, ...]],
     ) -> Union[CSEVariable, tuple[CSEVariable, ...]]:
+        print("111111111".asdd)
         def maybe_upcast(value: CSEVariable) -> CSEVariable:
             # Math reductions in FP16/BF16 are less accurate because the Triton compiler does not
             # automatically promote to FP32 for accumulation. Additionally, max/min reductions
@@ -2529,7 +2530,7 @@ class TritonKernel(SIMDKernel[TritonCSEVariable]):
         #if reduction_type in ('max') and reduction_type in ('argmax'):
         #    reduction_type = "max_argmax"
         TritonKernel.current_reductions.append((src_dtype, reduction_type, value))
-
+        print("reduction_analog_map",reduction_analog_map)
 
         reduction_type_search = reduction_type
         reduction_analog_map = {
