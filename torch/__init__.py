@@ -171,7 +171,7 @@ else:
     del _rocm_init
 
 
-from torch.version import cuda as cuda_version_str
+from .version import cuda as cuda_version_str
 
 
 if sys.platform == "win32":
