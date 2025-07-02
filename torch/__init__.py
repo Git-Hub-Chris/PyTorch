@@ -369,7 +369,7 @@ def _load_global_deps() -> None:
             # 2 patterns defined for each lib - first is specific,
             # second is generic backup.
             cuda_maj = int(cuda_version_str.split(".")[0])
-            cuda_libs: Dict[str, Union[str, List[str]] ] = {
+            cuda_libs: dict[str, _Union[str, list[str]] ] = {
                 "cublas": [f"libcublas.so.{cuda_maj}*", "libcublas.so.[0-9]"],
                 "cudnn": [f"libcudnn.so.{cuda_maj-3}*", "libcudnn.so.*[0-9]"],
                 "cuda_nvrtc": [f"libnvrtc.so.{cuda_maj}*", "libnvrtc.so.*[0-9]"],
