@@ -3864,9 +3864,6 @@ module_db: list[ModuleInfo] = [
     ModuleInfo(torch.nn.MaxPool3d,
                module_inputs_func=module_inputs_torch_nn_MaxPool3d,
                gradcheck_nondet_tol=GRADCHECK_NONDET_TOL,
-               skips=(
-                   # not supported on MPS backend
-                   DecorateInfo(skipIfMPS, device_type='mps'),)
                ),
     ModuleInfo(torch.nn.KLDivLoss,
                module_inputs_func=module_inputs_torch_nn_KLDivLoss,
@@ -4034,16 +4031,6 @@ module_db: list[ModuleInfo] = [
                ),
     ModuleInfo(torch.nn.Hardswish,
                module_inputs_func=module_inputs_torch_nn_Hardswish,
-               skips=None if _macos15_or_newer else (
-                   # Fails on backward check on MPS
-                   # See https://github.com/pytorch/pytorch/issues/107214
-                   DecorateInfo(
-                       unittest.expectedFailure,
-                       'TestModule',
-                       'test_memory_format',
-                       active_if=operator.itemgetter('training'),
-                       device_type='mps',
-                   ),),
                supports_gradgrad=False),
     ModuleInfo(torch.nn.Hardtanh,
                module_inputs_func=module_inputs_torch_nn_Hardtanh,
