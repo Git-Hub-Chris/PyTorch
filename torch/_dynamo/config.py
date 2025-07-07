@@ -403,6 +403,9 @@ enable_cpp_symbolic_shape_guards = not is_fbcode()
 # Enable tracing through contextlib.contextmanager
 enable_trace_contextlib = True
 
+# Enable tracing through einops instead of using allow_in_graph
+enable_einops_tracing = True
+
 # Enable tracing through unittest
 enable_trace_unittest = False
 
