@@ -441,6 +441,20 @@ def _get_custom_mod_func(func_name: str):
 
     
 def setup_privateuseone_for_python_backend(rename=None):
+    """This function will prepare the PrivateUse1 dispatch key to be used as a python backend.
+
+    Formally, this registers bunch of things that Pytorch expects a registered backend
+    in C++ to have: including device guards, hooks, and backend modules and what not.
+    
+    after this call, one can use `torch.library` to write Ops for this dispatch key
+    and expect it to behave like a backend registered in C++. 
+
+    See the unit test at test/test_privateuseone_python_backend.py for more details.
+    
+    Args:
+        rename: str | None, if passed in, we will rename privateuseone backend to 
+           the name given.
+    """
     # NOTE: the ordering of which these functions are called is important.
     class BackendModule:
 
