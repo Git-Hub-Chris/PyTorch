@@ -4205,6 +4205,36 @@ class GraphModule(torch.nn.Module):
         # vanilla compiled vs TMA compiled
         torch.testing.assert_close(out_tma_compiled, out_compiled, atol=2e-1, rtol=2e-1)
 
+    @supported_platform
+    @largeTensorTest("12GB", "cuda")
+    @skip_on_cpu
+    def test_int64_indexing_large_stride(self, device):
+        B = 1
+        H = 64
+        S = 2**20
+        D = 64
+        dtype = torch.float16
+
+        def _simple_causal(b, h, q_idx, kv_idx):
+            return q_idx >= kv_idx
+
+        BLOCK_M = 1024
+        BLOCK_N = 1024
+
+        block_mask = torch.compile(create_block_mask)(
+            _simple_causal, B, H, S, S, device=device, BLOCK_SIZE=(BLOCK_M, BLOCK_N)
+        )
+
+        q = torch.randn(B, H, S, D, device=device, dtype=dtype, requires_grad=True)
+        k = torch.randn(B, H, S, D, device=device, dtype=dtype, requires_grad=True)
+        v = torch.randn(B, H, S, D, device=device, dtype=dtype, requires_grad=True)
+
+        # This should raise NotImplementedError: 64-bit indexing is not yet implemented for triton templates
+        with self.assertRaisesRegex(
+            torch._inductor.exc.InductorError, "64-bit indexing is not yet implemented"
+        ):
+            torch.compile(flex_attention)(q, k, v, block_mask=block_mask)
+
 
 class TestBlockMask(InductorTestCase):
     def setUp(self):
