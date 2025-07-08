@@ -449,6 +449,7 @@ def setup_privateuseone_for_python_backend(rename=None):
 
         def is_available(self): 
             return True
+
         def current_device(self): 
             return 0
 
@@ -457,11 +458,11 @@ def setup_privateuseone_for_python_backend(rename=None):
 
         def manual_seed_all(self, seed: int): 
             pass
-        
+
         def device_count(self): 
             return 1
 
-        
+
     if rename is not None:
         torch.utils.rename_privateuse1_backend(rename)
     else:
@@ -470,4 +471,3 @@ def setup_privateuseone_for_python_backend(rename=None):
     torch.autograd.grad_mode.set_multithreading_enabled(False)
     torch._register_device_module(rename, BackendModule())
     torch._C.setup_privateuseone_for_python_use()
-
