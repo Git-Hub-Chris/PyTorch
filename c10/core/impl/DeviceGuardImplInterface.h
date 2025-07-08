@@ -250,17 +250,17 @@ struct C10_API DeviceGuardImplInterface {
 // A no-op device guard impl that doesn't do anything interesting.  Useful
 // for devices that don't actually have a concept of device index.  Prominent
 // examples are CPU and Meta.
-template <DeviceType D>
+template <DeviceType D, int default_index = -1>
 struct NoOpDeviceGuardImpl final : public DeviceGuardImplInterface {
   NoOpDeviceGuardImpl() = default;
   DeviceType type() const override {
     return D;
   }
   Device exchangeDevice(Device) const override {
-    return Device(D, -1); // no-op
+    return Device(D, default_index); // no-op
   }
   Device getDevice() const override {
-    return Device(D, -1);
+    return Device(D, default_index);
   }
   void setDevice(Device) const override {
     // no-op
@@ -270,19 +270,19 @@ struct NoOpDeviceGuardImpl final : public DeviceGuardImplInterface {
   }
   Stream getStream(Device) const noexcept override {
     // no-op
-    return Stream(Stream::DEFAULT, Device(D, -1));
+    return Stream(Stream::DEFAULT, Device(D, default_index));
   }
 
   Stream getNewStream(Device, int priority = 0) const override {
     // no-op
     (void)priority;
-    return Stream(Stream::DEFAULT, Device(D, -1));
+    return Stream(Stream::DEFAULT, Device(D, default_index));
   }
 
   // NB: These do NOT set the current device
   Stream exchangeStream(Stream) const noexcept override {
     // no-op
-    return Stream(Stream::DEFAULT, Device(D, -1));
+    return Stream(Stream::DEFAULT, Device(D, default_index));
   }
   DeviceIndex deviceCount() const noexcept override {
     return 1;
@@ -294,13 +294,14 @@ struct NoOpDeviceGuardImpl final : public DeviceGuardImplInterface {
       const Stream& /*stream*/,
       const DeviceIndex /*device_index*/,
       const EventFlag /*flag*/) const override {
-    TORCH_CHECK(false, D, " backend doesn't support events.");
+    //TORCH_CHECK(false, D, " backend doesn't support events.");
   }
   void block(void* /*event*/, const Stream& /*stream*/) const override {
-    TORCH_CHECK(false, D, " backend doesn't support events.")
+    //TORCH_CHECK(false, D, " backend doesn't support events.")
   }
   bool queryEvent(void* /*event*/) const override {
-    TORCH_CHECK(false, D, " backend doesn't support events.")
+    //TORCH_CHECK(false, D, " backend doesn't support events.")
+    return true;
   }
   void destroyEvent(void* /*event*/, const DeviceIndex /*device_index*/)
       const noexcept override {}
