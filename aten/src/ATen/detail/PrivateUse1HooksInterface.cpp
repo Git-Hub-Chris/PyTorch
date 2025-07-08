@@ -41,7 +41,9 @@ void setupPrivateUse1ForPythonUse() {
     at::RegisterPrivateUse1HooksInterface(&interface);
   }
   static ::c10::impl::DeviceGuardImplRegistrar 
-      g_PrivateUse1(c10::DeviceType::PrivateUse1, new c10::impl::NoOpDeviceGuardImpl<c10::DeviceType::PrivateUse1, 0>());
+      g_PrivateUse1(c10::DeviceType::PrivateUse1, new c10::impl::NoOpDeviceGuardImpl<c10::DeviceType::PrivateUse1>(
+        /* default_index */ 0, 
+        /* fail_on_event_functions */ false));
 }
 
 } // namespace at

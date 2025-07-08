@@ -6,27 +6,12 @@ from torch.overrides import TorchFunctionMode
 from torch.utils._pytree import tree_map
 import torch._C
 import torch.utils._mode_utils as mode_utils
+from torch.utils.backend_registration import setup_privateuseone_for_python_backend
 
 import numpy as np
 
-class TinyBackend:
-  def is_initialized(self): return True
-  def is_available(self): return True
-  def current_device(self): return 0
-  def _is_in_bad_fork(self): return False
-  def manual_seed_all(self, seed: int): 
-    pass
-  
-  def device_count(self): return 1
 
-  
-torch.utils.rename_privateuse1_backend('npy')
-torch.utils.generate_methods_for_privateuse1_backend()
-torch.autograd.grad_mode.set_multithreading_enabled(False)
-torch._register_device_module("npy", TinyBackend())
-torch._C.setup_privateuseone_for_python_use()
-
-
+setup_privateuseone_for_python_backend('npy')
 
 aten = torch.ops.aten
 
@@ -41,8 +26,6 @@ class MyDeviceTensor(torch.Tensor):
         res = torch.Tensor._make_wrapper_subclass(
             cls,
             like.size(),
-            strides=like.stride(),
-            storage_offset=0,
             requires_grad=requires_grad,
             device="privateuseone",
         )

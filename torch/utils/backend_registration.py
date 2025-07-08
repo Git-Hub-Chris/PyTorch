@@ -438,3 +438,36 @@ def _get_custom_mod_func(func_name: str):
         message += f"BackendModule needs to have the following API's:\n `{func_name}(*args, **kwargs)`. \n"
         raise RuntimeError(message)
     return function
+
+    
+def setup_privateuseone_for_python_backend(rename=None):
+    # NOTE: the ordering of which these functions are called is important.
+    class BackendModule:
+
+        def is_initialized(self): 
+            return True
+
+        def is_available(self): 
+            return True
+        def current_device(self): 
+            return 0
+
+        def _is_in_bad_fork(self): 
+            return False
+
+        def manual_seed_all(self, seed: int): 
+            pass
+        
+        def device_count(self): 
+            return 1
+
+        
+    if rename is not None:
+        torch.utils.rename_privateuse1_backend(rename)
+    else:
+        rename = "privateuseone"
+    torch.utils.generate_methods_for_privateuse1_backend()
+    torch.autograd.grad_mode.set_multithreading_enabled(False)
+    torch._register_device_module(rename, BackendModule())
+    torch._C.setup_privateuseone_for_python_use()
+
