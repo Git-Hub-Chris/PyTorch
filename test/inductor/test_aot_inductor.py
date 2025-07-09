@@ -47,11 +47,14 @@ from torch.testing._internal.common_quantization import (
 )
 from torch.testing._internal.common_utils import (
     DeterministicGuard,
+    filterByNvidiaArch,
+    H100_ARCH,
     IS_CI,
     IS_FBCODE,
     IS_MACOS,
     IS_WINDOWS,
     parametrize,
+    runOnNvidiaArch,
     skipIfRocm,
     skipIfXpu,
     TEST_WITH_ROCM,
@@ -138,6 +141,7 @@ except (unittest.SkipTest, ImportError):
     raise
 
 
+@filterByNvidiaArch()
 class AOTInductorTestsTemplate:
     @common_utils.parametrize("embed_kernel_binary", [False, True])
     @common_utils.parametrize("max_autotune", [False, True])
@@ -425,6 +429,7 @@ class AOTInductorTestsTemplate:
             ep, inductor_configs={"aot_inductor.use_runtime_constant_folding": True}
         )
 
+    @runOnNvidiaArch(H100_ARCH)
     @common_utils.parametrize("dynamic", [False, True])
     @common_utils.parametrize("tma_version", ["new", "old"])
     def test_triton_kernel_on_device_tma(self, dynamic, tma_version):
@@ -3219,6 +3224,7 @@ class AOTInductorTestsTemplate:
         example_inputs = (torch.randn(10, 20, device=self.device),)
         self.check_model(Model(), example_inputs)
 
+    @runOnNvidiaArch(H100_ARCH)
     @common_utils.parametrize("dynamic", [False, True])
     @common_utils.parametrize("tma_version", ["new", "old"])
     def test_triton_kernel_tma_descriptor_1d(self, dynamic, tma_version):
@@ -3281,6 +3287,7 @@ class AOTInductorTestsTemplate:
             dynamic_shapes=dynamic_shapes,
         )
 
+    @runOnNvidiaArch(H100_ARCH)
     @common_utils.parametrize("dynamic", [False, True])
     @common_utils.parametrize("tma_version", ["new", "old"])
     def test_triton_kernel_tma_descriptor_2d(self, dynamic, tma_version):
