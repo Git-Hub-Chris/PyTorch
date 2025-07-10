@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from torch._dynamo.exc import BackendCompilerFailed
+from torch._dynamo.utils import compilation_time_metrics
 from torch._inductor.codegen.cuda.serialization import get_cutlass_operation_serializer
 from torch._inductor.utils import clear_caches
 from torch.export import Dim
@@ -1551,6 +1552,45 @@ class TestCutlassBackend(TestCase):
             assert match, "Expect to find the cutlass configs log"
             num_ops = int(match.group(1))
             self.assertTrue(num_ops > 0, "The number of ops should be greater than 0")
+
+    @unittest.skipIf(not SM90OrLater, "need sm_90")
+    def test_maybe_append_choice_caching(self):
+        """
+        Test if maybe_append_choice's caching leads to correct results.
+        """
+
+        class TestModule(torch.nn.Module):
+            def forward(self, A, B):
+                for _ in range(10):
+                    A = A @ B / 32
+                return A
+
+        model = TestModule().cuda()
+        A = torch.randn(1024, 1024, dtype=torch.bfloat16, device="cuda")
+        B = torch.randn(1024, 1024, dtype=torch.bfloat16, device="cuda").t()
+
+        expected = model(A, B)
+
+        with config.patch(
+            {
+                "max_autotune": True,
+                "max_autotune_gemm_backends": "CUTLASS",
+                "fx_graph_cache": False,
+                "fx_graph_remote_cache": False,
+                "cuda.enable_caching_codegen": True,
+            }
+        ):
+            compiled_model = torch.compile(model, fullgraph=True)
+            actual = compiled_model(A, B)
+
+        torch.testing.assert_close(actual, expected)
+
+        time_spent: list[float] = compilation_time_metrics.get(
+            "CUTLASSGemmTemplate.maybe_append_choice", []
+        )
+        total_time_spent = sum(time_spent)
+        self.assertGreater(total_time_spent, 0)
+        self.assertLess(total_time_spent, 3)
 
     @unittest.skipIf(not SM90OrLater, "need sm_90")
     @mock.patch.dict(os.environ, {"PATH": _get_path_without_sccache()})
