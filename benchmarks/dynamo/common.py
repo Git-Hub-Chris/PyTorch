@@ -3590,7 +3590,7 @@ def run(runner, args, original_dir=None):
                 "detectron2_fasterrcnn_r_50_c4",
                 "detectron2_fasterrcnn_r_50_dc5",
                 "detectron2_fasterrcnn_r_50_fpn",
-            }:
+            }
         ):
             # some of the models do not support use_deterministic_algorithms
             torch.use_deterministic_algorithms(True)
