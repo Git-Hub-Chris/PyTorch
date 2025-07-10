@@ -31,12 +31,14 @@ from torch.testing._internal.inductor_utils import GPU_TYPE, HAS_GPU
 
 
 try:
+    from test_aot_inductor_utils import disable_constant_renaming
     from test_static_linkage_utils import (
         get_static_linkage_main_cpp_file,
         get_static_linkage_makelist_file_cpu,
         get_static_linkage_makelist_file_cuda,
     )
 except ImportError:
+    from .test_aot_inductor_utils import disable_constant_renaming
     from .test_static_linkage_utils import (
         get_static_linkage_main_cpp_file,
         get_static_linkage_makelist_file_cpu,
@@ -782,6 +784,7 @@ class TestAOTInductorPackage(TestCase):
         lambda device, package_cpp_only: package_cpp_only,
         "No support for cpp only",
     )
+    @disable_constant_renaming
     def test_update_weights(self):
         class Model(torch.nn.Module):
             def __init__(self, n, k, device):

@@ -52,6 +52,7 @@ from torch.testing._internal.common_utils import (
     IS_MACOS,
     IS_WINDOWS,
     parametrize,
+    serialTest,
     skipIfRocm,
     skipIfXpu,
     TEST_WITH_ROCM,
@@ -106,6 +107,7 @@ try:
             check_model,
             check_model_with_multiple_inputs,
             code_check_count,
+            disable_constant_renaming,
         )
         from .test_control_flow import (
             CondModels,
@@ -120,6 +122,7 @@ try:
             check_model,
             check_model_with_multiple_inputs,
             code_check_count,
+            disable_constant_renaming,
         )
         from test_control_flow import (  # @manual=fbcode//caffe2/test/inductor:control_flow-library
             CondModels,
@@ -306,6 +309,7 @@ class AOTInductorTestsTemplate:
         with config.patch({"aot_inductor.use_runtime_constant_folding": True}):
             self.check_model(Model(self.device), example_inputs)
 
+    @disable_constant_renaming
     def test_constant_folding_with_update(self):
         class Model(torch.nn.Module):
             def __init__(self, device):
@@ -814,6 +818,7 @@ class AOTInductorTestsTemplate:
         },
         post_grad_fusion_options={},
     )
+    @disable_constant_renaming
     def test_simple_split(self):
         class Model(torch.nn.Module):
             def __init__(self) -> None:
@@ -1390,6 +1395,13 @@ class AOTInductorTestsTemplate:
 
     @skipIfNoFBGEMM
     def test_quantized_linear(self):
+        if (config.freezing is None or config.freezing) and self.device != GPU_TYPE:
+            raise unittest.SkipTest(
+                "Freezing causes a failure within ATen/cpp_custom_type_hack.h::cast(), "
+                "which contains assertions about typical tensor deleters. This "
+                "function is deprecated, so no effort will be made to fix it."
+            )
+
         class Model(torch.nn.Module):
             def __init__(self, device):
                 super().__init__()
@@ -1407,6 +1419,13 @@ class AOTInductorTestsTemplate:
 
     @skipIfNoFBGEMM
     def test_quanatized_int8_linear(self):
+        if (config.freezing is None or config.freezing) and self.device != GPU_TYPE:
+            raise unittest.SkipTest(
+                "Freezing causes a failure within ATen/cpp_custom_type_hack.h::cast(), "
+                "which contains assertions about typical tensor deleters. This "
+                "function is deprecated, so no effort will be made to fix it."
+            )
+
         class Model(torch.nn.Module):
             def __init__(self, device):
                 super().__init__()
@@ -2961,6 +2980,7 @@ class AOTInductorTestsTemplate:
         example_inputs = (torch.randn(3, 10, device=self.device),)
         self.check_model(Model(), example_inputs)
 
+    @serialTest()
     def test_repeated_calling(self):
         if self.device != "cuda":
             raise unittest.SkipTest("requires CUDA")
@@ -3860,6 +3880,7 @@ class AOTInductorTestsTemplate:
         inputs = (torch.tensor([3.14], dtype=torch.float, device=self.device),)
         self.check_model(Model(), inputs)
 
+    @disable_constant_renaming
     def test_constant_original_fqn_and_dtype(self):
         class FooBarModule(torch.nn.Module):
             def __init__(self) -> None:
@@ -4789,6 +4810,7 @@ class AOTInductorTestsTemplate:
         }
         self.check_model(model, example_inputs, dynamic_shapes=dynamic_shapes)
 
+    @disable_constant_renaming
     def test_aoti_debug_printer_codegen(self):
         # basic addmm model to test codegen for aoti intermediate debug printer
         class Model(torch.nn.Module):
@@ -4874,6 +4896,7 @@ class AOTInductorTestsTemplate:
                 FileCheck().check_not(f"after_launch - {kernel_name}").run(code)
 
     @common_utils.parametrize("enable_kernel_profile", (True, False))
+    @disable_constant_renaming
     def test_aoti_profiler(self, enable_kernel_profile):
         # basic addmm model
         class Model(torch.nn.Module):
@@ -5263,14 +5286,18 @@ class AOTInductorTestsTemplate:
         so_path, code = run_and_get_cpp_code(
             AOTIRunnerUtil.legacy_compile, model, example_inputs
         )
-        lowerbound_check = "u1 >= 1" if mark_unbacked else "u0 >= 2"
+        is_cpu_freezing = (
+            config.freezing is None or config.freezing
+        ) and self.device != GPU_TYPE
+        varname = f"u{int(mark_unbacked) + 2 * int(is_cpu_freezing)}"
+        lowerbound_check = f"{varname} >= {1 if mark_unbacked else 2}"
         FileCheck().check_count(lowerbound_check, 1).run(code)
 
         compiled = AOTIRunnerUtil.legacy_load(self.device, so_path)
         compiled(*example_inputs)
 
         # Check the runtime assertion.
-        with self.assertRaisesRegex(Exception, ""):
+        with self.assertRaises(Exception):
             unexpected_inputs = (torch.ones(0, device=self.device), b, c)
             compiled(*unexpected_inputs)
 
@@ -5368,6 +5395,7 @@ class AOTInductorTestsTemplate:
         example_inputs = (torch.randn(2, 128, 4096, device=self.device),)
         self.check_model(Model(), example_inputs, dynamic_shapes={"x": {0: bs}})
 
+    @disable_constant_renaming
     def test_so_without_weight(self):
         class Model(torch.nn.Module):
             def __init__(self, n, k, device):
@@ -5444,6 +5472,7 @@ class AOTInductorTestsTemplate:
         output = runner_call(test_inputs)
         self.assertEqual(expected, output)
 
+    @disable_constant_renaming
     def test_weight_on_disk_legacy(self):
         class Model(torch.nn.Module):
             def __init__(self, n, k, device):
@@ -5485,6 +5514,7 @@ class AOTInductorTestsTemplate:
 
         self.assertEqual(loaded1(a), model(a))
 
+    @disable_constant_renaming
     def test_extract_constants_map(self):
         class Model(torch.nn.Module):
             def __init__(self, n, k, device):
@@ -5549,6 +5579,7 @@ class AOTInductorTestsTemplate:
         self.assertEqual(original_weights, extracted_inactive_weights)
         self.assertEqual(new_weights, extracted_active_weights)
 
+    @disable_constant_renaming
     def test_update_constant_buffer(self):
         class Model(torch.nn.Module):
             def __init__(self, n, k, device):
@@ -5608,6 +5639,7 @@ class AOTInductorTestsTemplate:
         )
         self.assertEqual(new_expected, new_output)
 
+    @disable_constant_renaming
     def test_update_inactive_constant_buffer(self):
         class Model(torch.nn.Module):
             def __init__(self, n, k, device):
@@ -5662,6 +5694,7 @@ class AOTInductorTestsTemplate:
         self.assertEqual(expected, output_before_swap)
         self.assertEqual(new_expected, output_after_swap)
 
+    @disable_constant_renaming
     def test_free_inactive_buffer(self):
         if self.device != GPU_TYPE:
             raise unittest.SkipTest("requires GPU")
@@ -5736,6 +5769,7 @@ class AOTInductorTestsTemplate:
 
         runner.free_inactive_constant_buffer()
 
+    @disable_constant_renaming
     def test_update_user_managed_buffer(self):
         if self.device != "cuda":
             raise unittest.SkipTest("requires CUDA")
