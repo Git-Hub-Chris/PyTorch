@@ -137,7 +137,7 @@ except (unittest.SkipTest, ImportError):
         sys.exit(0)
     raise
 
-
+@unittest.skipIf(IS_WINDOWS, "aoti not support on Windows")
 class AOTInductorTestsTemplate:
     @common_utils.parametrize("embed_kernel_binary", [False, True])
     @common_utils.parametrize("max_autotune", [False, True])
@@ -6519,6 +6519,7 @@ class AOTInductorTestsTemplate:
         self.assertEqual(aot_inductor_module(*example_inputs), model(*example_inputs))
 
 
+@unittest.skipIf(IS_WINDOWS, "aoti not support on Windows")
 class AOTInductorLoggingTest(LoggingTestCase):
     @make_logging_test(dynamic=logging.DEBUG)
     def test_shape_env_reuse(self, records):
@@ -6606,7 +6607,7 @@ GPU_TEST_FAILURES = {
     "test_fft_c2c": fail_gpu(("xpu",), is_skip=True),
 }
 
-
+@unittest.skipIf(IS_WINDOWS, "aoti not support on Windows")
 class AOTInductorTestABICompatibleCpu(TestCase):
     device = "cpu"
     device_type = "cpu"
@@ -6624,7 +6625,7 @@ copy_tests(
     CPU_TEST_FAILURES,
 )
 
-
+@unittest.skipIf(IS_WINDOWS, "aoti not support on Windows")
 @unittest.skipIf(sys.platform == "darwin", "No CUDA on MacOS")
 class AOTInductorTestABICompatibleGpu(TestCase):
     device = GPU_TYPE

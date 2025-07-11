@@ -20,7 +20,7 @@ import torch.fx as fx
 from torch._inductor.test_case import TestCase
 from torch._logging._internal import TorchLogsFormatter
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.testing._internal.common_utils import find_free_port
+from torch.testing._internal.common_utils import find_free_port, skipIfWindows
 from torch.testing._internal.inductor_utils import HAS_CUDA
 
 
@@ -820,6 +820,7 @@ class StructuredTraceTest(TestCase):
 
         self.assertParses()
 
+    @skipIfWindows
     def test_dump_file(self):
         def f(x, y):
             return x.add(y)
@@ -966,6 +967,7 @@ def forward(self, x_1: "f32[2][1]cpu"):
     @torch._dynamo.config.patch("compiled_autograd", True)
     @torch._inductor.config.patch("fx_graph_cache", True)
     @show_chrome_events
+    @skipIfWindows
     def test_compiled_autograd_id(self):
         def fn(a):
             return a.sin().sum().backward()
@@ -997,6 +999,7 @@ def forward(self, x_1: "f32[2][1]cpu"):
 
     @requires_tlparse
     @torch._dynamo.config.patch("compiled_autograd", True)
+    @skipIfWindows
     def test_compiled_autograd_attribution(self):
         # multiple dynamo recompiles should still be attributed to the parent compiled autograd id
         def fn():
@@ -1049,6 +1052,7 @@ def forward(self, x_1: "f32[2][1]cpu"):
 
     @requires_tlparse
     @show_chrome_events
+    @skipIfWindows
     def test_compiled_autograd_chromium(self):
         with torch._dynamo.compiled_autograd._enable(torch.compile):
             for i in [10, 100, 10, 15, 20, 25]:

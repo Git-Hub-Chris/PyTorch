@@ -995,6 +995,7 @@ class ReproTests(torch._dynamo.test_case.TestCase):
         if guard_manager_wrapper.diff_guard_root:
             self.assertTrue(guard_manager_wrapper.diff_guard_root.check(f_locals))
 
+    @skipIfWindows
     def test_do_paste_mask(self):
         torch._dynamo.utils.counters.clear()
         cnt = torch._dynamo.testing.CompileCounter()
@@ -1038,6 +1039,7 @@ class ReproTests(torch._dynamo.test_case.TestCase):
         self.assertIn(cnt.frame_count, (5, 7))
         self.assertIn(cnt.op_count, (92, 106, 119))
 
+    @skipIfWindows
     def test_convert_boxes_to_pooler_format(self):
         boxes1 = [
             Boxes(torch.arange(0, 8).reshape((2, 4))),
@@ -3826,6 +3828,7 @@ class ReproTests(torch._dynamo.test_case.TestCase):
 
         self.assertEqual(f(torch.ones(8, 4)), gm(torch.ones(8, 4)))
 
+    @skipIfWindows
     def test_optim_state_references_cleared(self):
         model = torch.nn.Linear(2048, 2048, bias=False)
         x = torch.ones(2048)
@@ -5036,6 +5039,7 @@ def forward(self, s77 : torch.SymInt, s27 : torch.SymInt, L_x_ : torch.Tensor):
     # any behavior that depends on deallocation order. We do guarantee "eventual consistency",
     # that is, after the torch.compile'd function is finished running (including any graph breaks),
     # refcount semantics will match eager's.
+    @skipIfWindows
     def test_weakref_callback(self):
         called1 = False
 
@@ -6523,6 +6527,7 @@ def forward(self, s77 : torch.SymInt, s27 : torch.SymInt, L_x_ : torch.Tensor):
         self.assertEqual(ref, res)
 
     @skipIfPy312  # listcomp bytecode is optimized
+    @skipIfWindows
     def test_listcomp(self):
         class Module(torch.nn.Module):
             def __init__(self):

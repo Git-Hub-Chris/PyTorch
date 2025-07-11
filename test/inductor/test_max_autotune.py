@@ -88,6 +88,7 @@ class FailChoiceCaller(ChoiceCaller):
 )
 @config.patch(enable_caching_generated_triton_templates=True)
 @instantiate_parametrized_tests
+@unittest.skipIf(not (HAS_GPU and HAS_CPU),"has no GPU")
 class TestMaxAutotune(TestCase):
     @parametrize("dynamic", (False, True))
     def test_max_autotune_mm_plus_mm_zero_size_input(self, dynamic):
@@ -1550,7 +1551,7 @@ class TestMaxAutotune(TestCase):
                 if "benchmark_gpu" in counter:
                     self.assertEqual(counters["inductor"][counter], 2)
 
-
+@unittest.skipIf(not (HAS_GPU and HAS_CPU),"has no GPU")
 class TestMaxAutotunePrecompile(TestCase):
     def test_precompilation_threads(self):
         import threading
@@ -1657,6 +1658,7 @@ class TestMaxAutotunePrecompile(TestCase):
 
 
 @instantiate_parametrized_tests
+@unittest.skipIf(not (HAS_GPU and HAS_CPU),"has no GPU")
 class TestMaxAutotuneSubproc(TestCase):
     def _create_buffer(self, name, shape):
         return Buffer(
@@ -1849,6 +1851,7 @@ class TestMaxAutotuneSubproc(TestCase):
 
 
 @instantiate_parametrized_tests
+@unittest.skipIf(not (HAS_GPU and HAS_CPU),"has no GPU")
 class TestMaxAutotuneRemoteCache(TestCase):
     def setUp(self):
         super().setUp()
@@ -1927,7 +1930,7 @@ class _TestTritonTemplateCaller(TritonTemplateCaller):
     def __str__(self) -> str:
         return "test"
 
-
+@unittest.skipIf(not (HAS_GPU and HAS_CPU),"has no GPU")
 class TestTuningProcess(TestCase):
     def check_healthy(self, p: TuningProcess, device: Optional[int] = None):
         result = random.random()
@@ -1984,7 +1987,7 @@ class TestTuningProcess(TestCase):
             self.check_healthy(p, device=device)
             p.shutdown()
 
-
+@unittest.skipIf(not (HAS_GPU and HAS_CPU),"has no GPU")
 class TestTuningProcessPool(TestCase):
     # Use only one device/subprocess so we test the process restarts
     # and is usable after a crash.
@@ -2064,6 +2067,7 @@ class TestTuningProcessPool(TestCase):
 
 
 @instantiate_parametrized_tests
+@unittest.skipIf(not (HAS_GPU and HAS_CPU),"has no GPU")
 class TestPrologueFusion(TestCase):
     @classmethod
     def setUpClass(cls):

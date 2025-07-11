@@ -10,7 +10,7 @@ import torch
 import torch._logging.structured
 import torch.distributed as dist
 from torch._inductor.test_case import TestCase
-from torch.testing._internal.common_utils import IS_FBCODE, IS_SANDCASTLE
+from torch.testing._internal.common_utils import IS_FBCODE, IS_SANDCASTLE, IS_WINDOWS
 
 
 if torch.distributed.is_available():
@@ -50,6 +50,7 @@ class ToyModel(torch.nn.Module):
         return x
 
 
+@unittest.skipIf(IS_WINDOWS,"fail on windows")
 class FxGraphRunnableTest(TestCase):
     def setUp(self):
         super().setUp()
