@@ -1,10 +1,16 @@
 # mypy: allow-untyped-defs
 
 import logging
+from typing import Any, Optional, TYPE_CHECKING
 
 import torch
 
 from .. import ir
+from ..lookup_table import (
+    lookup_op_config_entries,
+    lookup_table_extract_choices,
+    lookup_template_configs_from_op,
+)
 from ..lowering import lowerings
 from ..select_algorithm import (
     autotune_select_algorithm,
@@ -15,6 +21,9 @@ from ..utils import use_aten_gemm_kernels, use_triton_template
 from ..virtualized import V
 from .mm_common import get_triton_mm_params, mm_args, mm_grid
 
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 log = logging.getLogger(__name__)
 
@@ -145,27 +154,39 @@ def tuned_mm_plus_mm(mat1, mat2, mat3, mat4, *, layout=None):
         )
 
     assert layout1 == layout2
+    # Get lookup table configs grouped by template_id
+    op_lookup_dict = lookup_op_config_entries([mat1, mat2, mat3, mat4], "mm_plus_mm")
+    aten_params = lookup_template_configs_from_op(op_lookup_dict, "aten")
+
     # options to tune from
-    choices = (
-        [aten_mm_plus_mm.bind((mat1, mat2, mat3, mat4), layout1)]
-        if use_aten_gemm_kernels()
-        else []
-    )
+    def add_aten():
+        return [aten_mm_plus_mm.bind((mat1, mat2, mat3, mat4), layout1)]
+
+    choices: list[Any] = []
+    if use_aten_gemm_kernels():
+        if aten_params is None or len(aten_params) > 0:
+            # Either the lookup table asked for ATEN, or the lookup table is not
+            # in use in which case, we should add ATEN
+            choices = choices + add_aten()
 
     mm_configs = V.choices.get_mm_plus_mm_configs(device_type)
 
     if use_triton_template(layout1):
-        # Get template params using helper function (without dtype.itemsize for mm_plus_mm)
-        template_params = get_triton_mm_params(
-            [mat1, mat2, mat3, mat4],
-            "mm_plus_mm",
-            m1,
-            n1,
-            k1,
-            layout1,
-            device_type,
-            mm_configs,
+        # Use lookup table if available, otherwise fall back to existing logic
+        template_params: Optional[Iterable[dict[str, Any]]] = (
+            lookup_template_configs_from_op(op_lookup_dict, mm_plus_mm_template.name)
         )
+        if template_params is None:
+            template_params = get_triton_mm_params(
+                [mat1, mat2, mat3, mat4],
+                "mm_plus_mm",
+                m1,
+                n1,
+                k1,
+                layout1,
+                device_type,
+                mm_configs,
+            )
 
         # Apply BLOCK_K constraint specific to mm_plus_mm
         filtered_params = []
@@ -185,6 +206,9 @@ def tuned_mm_plus_mm(mat1, mat2, mat3, mat4, *, layout=None):
             if e is None:
                 # This means we successfully appended a choice
                 log.debug("added choice %r with kwargs %r", choices[-1].name, kwargs)
+
+    # Safe noop if lookup table is not in use
+    choices = lookup_table_extract_choices(choices, add_aten)
 
     return autotune_select_algorithm(
         "mm_plus_mm", choices, [mat1, mat2, mat3, mat4], layout1

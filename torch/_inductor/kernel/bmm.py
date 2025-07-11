@@ -1,11 +1,17 @@
 # mypy: allow-untyped-defs
 import logging
+from typing import Any, Optional, TYPE_CHECKING
 
 import torch
 from torch._dynamo.utils import counters
 from torch._inductor.codegen.rocm.ck_universal_gemm_template import CKGemmTemplate
 
 from .. import ir, lowering as L
+from ..lookup_table import (
+    lookup_op_config_entries,
+    lookup_table_extract_choices,
+    lookup_template_configs_from_op,
+)
 from ..select_algorithm import (
     autotune_select_algorithm,
     ExternKernelChoice,
@@ -32,6 +38,9 @@ from .mm_common import (
     mm_options,
 )
 
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 log = logging.getLogger(__name__)
 aten = torch.ops.aten
@@ -194,8 +203,16 @@ def tuned_bmm(mat1, mat2, out_dtype=None, *, layout=None):
     else:
         aten_func = aten_bmm.bind((mat1, mat2), layout)
 
+    # Get lookup table configs grouped by template_id
+    op_lookup_dict = lookup_op_config_entries([mat1, mat2], name)
+    aten_params = lookup_template_configs_from_op(op_lookup_dict, "aten")
     # options to tune from
-    choices = [aten_func] if use_aten_gemm_kernels() else []
+    choices: list[Any] = []
+    if use_aten_gemm_kernels():
+        if aten_params is None or len(aten_params) > 0:
+            # Either the lookup table asked for ATEN, or the lookup table is not
+            # in use in which case, we should add ATEN
+            choices = choices + [aten_func]
 
     device_type = ir.get_device_type(mat1)
     bmm_configs = V.choices.get_base_mm_configs(device_type)
@@ -203,9 +220,17 @@ def tuned_bmm(mat1, mat2, out_dtype=None, *, layout=None):
     if use_triton_template(layout):
         # TODO: add out_dtype support for Triton Template
         assert out_dtype is None, "out_dtype is not supported for Triton"
-        for kwargs in get_triton_mm_params(
-            [mat1, mat2], name, m, n, k, layout, device_type, bmm_configs
-        ):
+
+        # Use lookup table if available, otherwise fall back to existing logic
+        template_params: Optional[Iterable[dict[str, Any]]] = (
+            lookup_template_configs_from_op(op_lookup_dict, bmm_template.name)
+        )
+        if template_params is None:
+            template_params = get_triton_mm_params(
+                [mat1, mat2], name, m, n, k, layout, device_type, bmm_configs
+            )
+
+        for kwargs in template_params:
             e = bmm_template.maybe_append_choice(
                 choices,
                 input_nodes=(mat1, mat2),
@@ -238,6 +263,9 @@ def tuned_bmm(mat1, mat2, out_dtype=None, *, layout=None):
 
     if use_ck_gemm_template(layout, m, n, k):
         CKGemmTemplate.add_ck_gemm_choices(choices, layout, [mat1, mat2])
+
+    # Safe noop if lookup table is not in use
+    choices = lookup_table_extract_choices(choices, lambda: [aten_func])
 
     return autotune_select_algorithm("bmm", choices, [mat1, mat2], layout)
 
