@@ -415,10 +415,15 @@ class HigherOrderOperator(OperatorBase, abc.ABC):
                         # TODO(rzou): we should support torch_dispatch calling convention too.
                         result = handler(mode, *args, **kwargs)
                 else:
-                    raise NotImplementedError(
-                        f"There was no rule registered for HOP {self._name} and mode {curr_mode}. "
-                        f"We recommend filing an issue."
-                    )
+                    if curr_mode.supports_higher_order_operators:
+                        with _pop_mode_temporarily() as mode:
+                            return curr_mode.__torch_dispatch__(self, [], args, kwargs)
+                    else:
+                        raise NotImplementedError(
+                            f"There was no rule registered for HigherOrderOperator {self._name} and mode {curr_mode}. "
+                            f"To do so, please set {curr_mode}'s supports_higher_order_operators to True and add support"
+                            f" for {self._name} in {curr_mode}.__torch_dispatch__."
+                        )
                 if result is not NotImplemented:
                     return result
 
@@ -457,10 +462,12 @@ class HigherOrderOperator(OperatorBase, abc.ABC):
 
             # All handlers returned NotImplemented
             raise TypeError(
-                f"Multiple dispatch failed for {self._name}. There was no registered that "
-                f"did not return NotImplemented. Use HOP.py_impl to register some. "
-                f"Tried mode: {curr_mode}) and subclasses: "
-                f"{[type(a) for a in overloaded_args]}"
+                f"Operation '{self._name}' is not supported for the given input types. "
+                f"This typically happens when using custom tensor types or dispatch modes that don't "
+                f"have implementations for this operation.\n\n"
+                f"Current mode: {curr_mode}\n"
+                f"Input types: {[type(a).__name__ for a in overloaded_args]}\n\n"
+                f"To fix this, can add support for '{self._name}' in {curr_mode}'s __torch_dispatch__\n"
             )
 
         functionality_key = torch._C._to_functionality_key(dispatch_key)  # type: ignore[attr-defined]
