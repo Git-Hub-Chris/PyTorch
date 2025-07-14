@@ -597,10 +597,7 @@ def _should_use_dense_strides(
     """Check if we should compute dense strides for the tensor."""
     if memory_format not in (None, torch.preserve_format):
         return False
-
-    import torch._prims_common as prims_common
-
-    return not prims_common.is_non_overlapping_and_dense(tensor)
+    return not utils.is_non_overlapping_and_dense(tensor)
 
 
 def _get_symbolic_value(value, default=None):
