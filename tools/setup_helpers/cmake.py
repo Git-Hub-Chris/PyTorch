@@ -372,10 +372,11 @@ class CMake:
                 # This helps CMake find the correct include directory for NumPy
                 # This is especially useful in cross compiled environments
                 import numpy
+
                 Python_NumPy_INCLUDE_DIR = numpy.get_include()
-                build_options.update(dict(
-                    Python_NumPy_INCLUDE_DIR=Python_NumPy_INCLUDE_DIR
-                ))
+                build_options.update(
+                    dict(Python_NumPy_INCLUDE_DIR=Python_NumPy_INCLUDE_DIR)
+                )
             except ImportError:
                 # use_numpy is just a hint.... so we can fail silently here
                 pass
