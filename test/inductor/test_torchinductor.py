@@ -9286,6 +9286,135 @@ def forward(self, arg0_1: "Sym(s77)", arg1_1: "Sym(s27)", arg2_1: "Sym(s53)", ar
         self.assertTrue(a0.device.type == GPU_TYPE)
         self.assertTrue(a1.device.type == "cpu")
 
+    def test_like_strided_tensors(self):
+        """Test that *_like functions preserve strides with non-contiguous tensors"""
+        # Create input with specific shape to match original issue
+        x = torch.randn(2, 2, 4, 4)
+
+        def fn(x):
+            # Create non-contiguous tensor via transpose (like rot90)
+            y = x.transpose(2, 3)
+            # Test each *_like function
+            z1 = torch.randn_like(y)
+            z2 = torch.rand_like(y)
+            z3 = torch.full_like(y, 3.14)
+            z4 = torch.randint_like(y, 10)
+            return z1, z2, z3, z4
+
+        # Test 1: Test with fallback_random=True for eager/compile parity
+        with config.patch(fallback_random=True):
+            # Set manual seed for eager mode
+            torch.manual_seed(123)
+            eager_z1, eager_z2, eager_z3, eager_z4 = fn(x)
+
+            # Reset seed for compiled mode
+            torch.manual_seed(123)
+            compiled_fn = torch.compile(fn, backend="inductor")
+            comp_z1, comp_z2, comp_z3, comp_z4 = compiled_fn(x)
+
+            # Check strides are preserved
+            y = x.transpose(2, 3)
+            for name, eager, comp in [
+                ("randn_like", eager_z1, comp_z1),
+                ("rand_like", eager_z2, comp_z2),
+                ("full_like", eager_z3, comp_z3),
+                ("randint_like", eager_z4, comp_z4),
+            ]:
+                self.assertEqual(
+                    eager.stride(),
+                    y.stride(),
+                    f"{name} eager mode failed to preserve stride",
+                )
+                self.assertEqual(
+                    comp.stride(),
+                    y.stride(),
+                    f"{name} compiled mode failed to preserve stride",
+                )
+
+            # With fallback_random, only deterministic values will match
+            # Random ops may consume different amounts of RNG state even with fallback
+            self.assertEqual(eager_z3, comp_z3)  # full_like (deterministic)
+
+        # Test 2: Test without fallback_random (only check strides)
+        compiled_fn = torch.compile(fn, backend="inductor")
+        comp_z1, comp_z2, comp_z3, comp_z4 = compiled_fn(x)
+
+        # Only check strides, not values
+        y = x.transpose(2, 3)
+        for name, comp in [
+            ("randn_like", comp_z1),
+            ("rand_like", comp_z2),
+            ("full_like", comp_z3),
+            ("randint_like", comp_z4),
+        ]:
+            self.assertEqual(
+                comp.stride(),
+                y.stride(),
+                f"{name} compiled mode failed to preserve stride",
+            )
+
+    def test_like_stride_preservation(self):
+        """Test that *_like functions correctly preserve or compact strides across various cases"""
+        import torch._prims_common as prims_common
+        
+        # Define test cases: (name, tensor_creation_lambda, validation_lambda)
+        test_cases = [
+            # Stride 0 cases (expanded/broadcasted tensors)
+            ("expand", lambda: torch.tensor([1.0]).expand(3, 4), None),
+            ("broadcast", lambda: torch.randn(1, 5).expand(3, 5), None),
+            ("mixed_stride0", lambda: torch.empty_strided((3, 1, 4), (4, 0, 1)), None),
+            ("multi_stride0", lambda: torch.randn(1, 1, 5).expand(3, 4, 5), None),
+            
+            # Stride compacting cases (tensors with gaps)
+            ("gaps_2d", lambda: torch.empty_strided((10, 10), (20, 1)), 
+             lambda x: prims_common.is_non_overlapping_and_dense(x)),
+            ("gaps_3d", lambda: torch.empty_strided((10, 10, 10), (200, 20, 1)), 
+             lambda x: prims_common.is_non_overlapping_and_dense(x)),
+            ("gaps_permuted", lambda: torch.empty_strided((5, 4, 3), (50, 1, 15)), 
+             lambda x: prims_common.is_non_overlapping_and_dense(x)),
+            ("gaps_1d", lambda: torch.empty_strided((10,), (3,)), 
+             lambda x: prims_common.is_non_overlapping_and_dense(x)),
+            ("gaps_mixed", lambda: torch.empty_strided((3, 1, 4), (20, 0, 2)), 
+             lambda x: prims_common.is_non_overlapping_and_dense(x)),
+            
+            # Edge cases
+            ("rot90", lambda: torch.empty((3, 3)).rot90(1), None),
+            ("scalar", lambda: torch.tensor(3.14), None),
+            ("empty", lambda: torch.empty((0, 5)), None),
+            ("channels_last", lambda: torch.empty((1, 3, 32, 32)).to(memory_format=torch.channels_last),
+             lambda x: x.is_contiguous(memory_format=torch.channels_last)),
+        ]
+        
+        # Test both rand_like and randn_like
+        for like_fn in [torch.rand_like, torch.randn_like]:
+            fn_name = like_fn.__name__
+            
+            for test_name, tensor_fn, validation_fn in test_cases:
+                with self.subTest(function=fn_name, test=test_name):
+                    # Create test function
+                    def test_fn():
+                        return like_fn(tensor_fn())
+                    
+                    # Run eager mode
+                    eager_result = test_fn()
+                    
+                    # Run compiled mode
+                    compiled_fn = torch.compile(test_fn, backend="inductor")
+                    comp_result = compiled_fn()
+                    
+                    # Check that strides match
+                    self.assertEqual(
+                        eager_result.stride(), comp_result.stride(),
+                        f"{fn_name} stride mismatch for {test_name}"
+                    )
+                    
+                    # Run additional validation if provided
+                    if validation_fn:
+                        self.assertTrue(
+                            validation_fn(comp_result),
+                            f"{fn_name} validation failed for {test_name}"
+                        )
+
     def test_max_pool2d_with_indices_backward(self):
         def fn(a, b, c):
             return aten.max_pool2d_with_indices_backward(
