@@ -591,7 +591,7 @@ def get_like_layout(
         return memory_format
 
 
-def _get_symbolic_value(value, default=None):
+def _get_symbolic_value(value: Any, default: Optional[int] = None) -> Union[int, Any]:
     """Extract concrete value from symbolic integer if possible."""
     if hasattr(value, "node"):
         concrete_val = value.node.maybe_as_int()

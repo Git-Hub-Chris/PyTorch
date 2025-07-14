@@ -9445,96 +9445,138 @@ def forward(self, arg0_1: "Sym(s77)", arg1_1: "Sym(s27)", arg2_1: "Sym(s53)", ar
         # Test channels_last format preservation
         x_4d = torch.randn(2, 3, 32, 32).to(memory_format=torch.channels_last)
         x_5d = torch.randn(2, 3, 4, 32, 32).to(memory_format=torch.channels_last_3d)
-        
+
         test_cases = [
             ("channels_last_4d", x_4d),
             ("channels_last_3d_5d", x_5d),
         ]
-        
+
         for test_name, tensor in test_cases:
             with self.subTest(test_name=test_name):
                 # Verify the tensor has the expected memory format
                 if tensor.ndim == 4:
-                    self.assertTrue(tensor.is_contiguous(memory_format=torch.channels_last))
+                    self.assertTrue(
+                        tensor.is_contiguous(memory_format=torch.channels_last)
+                    )
                 else:
-                    self.assertTrue(tensor.is_contiguous(memory_format=torch.channels_last_3d))
-                
+                    self.assertTrue(
+                        tensor.is_contiguous(memory_format=torch.channels_last_3d)
+                    )
+
                 # Test each function
                 for fn_name, fn, compiled_fn in [
-                    ("rand_like", torch.rand_like, torch.compile(torch.rand_like, backend="inductor")),
-                    ("randn_like", torch.randn_like, torch.compile(torch.randn_like, backend="inductor")),
-                    ("full_like", lambda x: torch.full_like(x, 3.14), torch.compile(lambda x: torch.full_like(x, 3.14), backend="inductor")),
-                    ("randint_like", lambda x: torch.randint_like(x, 10), torch.compile(lambda x: torch.randint_like(x, 10), backend="inductor")),
+                    (
+                        "rand_like",
+                        torch.rand_like,
+                        torch.compile(torch.rand_like, backend="inductor"),
+                    ),
+                    (
+                        "randn_like",
+                        torch.randn_like,
+                        torch.compile(torch.randn_like, backend="inductor"),
+                    ),
+                    (
+                        "full_like",
+                        lambda x: torch.full_like(x, 3.14),
+                        torch.compile(
+                            lambda x: torch.full_like(x, 3.14), backend="inductor"
+                        ),
+                    ),
+                    (
+                        "randint_like",
+                        lambda x: torch.randint_like(x, 10),
+                        torch.compile(
+                            lambda x: torch.randint_like(x, 10), backend="inductor"
+                        ),
+                    ),
                 ]:
                     eager_result = fn(tensor)
                     compiled_result = compiled_fn(tensor)
-                    
+
                     # Check that strides match
                     self.assertEqual(
                         eager_result.stride(),
                         compiled_result.stride(),
                         f"{fn_name} stride mismatch for {test_name}",
                     )
-                    
+
                     # Check that channels_last format is preserved
                     if tensor.ndim == 4:
                         self.assertTrue(
-                            eager_result.is_contiguous(memory_format=torch.channels_last),
+                            eager_result.is_contiguous(
+                                memory_format=torch.channels_last
+                            ),
                             f"{fn_name} didn't preserve channels_last for {test_name}",
                         )
                         self.assertTrue(
-                            compiled_result.is_contiguous(memory_format=torch.channels_last),
+                            compiled_result.is_contiguous(
+                                memory_format=torch.channels_last
+                            ),
                             f"{fn_name} compiled didn't preserve channels_last for {test_name}",
                         )
                     else:
                         self.assertTrue(
-                            eager_result.is_contiguous(memory_format=torch.channels_last_3d),
+                            eager_result.is_contiguous(
+                                memory_format=torch.channels_last_3d
+                            ),
                             f"{fn_name} didn't preserve channels_last_3d for {test_name}",
                         )
                         self.assertTrue(
-                            compiled_result.is_contiguous(memory_format=torch.channels_last_3d),
+                            compiled_result.is_contiguous(
+                                memory_format=torch.channels_last_3d
+                            ),
                             f"{fn_name} compiled didn't preserve channels_last_3d for {test_name}",
                         )
 
     def test_like_explicit_memory_format(self):
         """Test that *_like functions correctly handle explicit memory format arguments"""
         x = torch.randn(2, 3, 32, 32)  # Start with contiguous tensor
-        
+
         # Test explicit memory format conversions
         test_cases = [
             ("to_channels_last", torch.channels_last),
             ("to_contiguous", torch.contiguous_format),
             ("preserve_format", torch.preserve_format),
         ]
-        
+
         for test_name, memory_format in test_cases:
             with self.subTest(test_name=test_name):
                 # Test each function with explicit memory format
                 for fn_name, fn_lambda in [
                     ("rand_like", lambda x, mf: torch.rand_like(x, memory_format=mf)),
                     ("randn_like", lambda x, mf: torch.randn_like(x, memory_format=mf)),
-                    ("full_like", lambda x, mf: torch.full_like(x, 3.14, memory_format=mf)),
-                    ("randint_like", lambda x, mf: torch.randint_like(x, 10, memory_format=mf)),
+                    (
+                        "full_like",
+                        lambda x, mf: torch.full_like(x, 3.14, memory_format=mf),
+                    ),
+                    (
+                        "randint_like",
+                        lambda x, mf: torch.randint_like(x, 10, memory_format=mf),
+                    ),
                 ]:
                     eager_result = fn_lambda(x, memory_format)
                     compiled_fn = torch.compile(fn_lambda, backend="inductor")
                     compiled_result = compiled_fn(x, memory_format)
-                    
+
                     # Check that strides match
                     self.assertEqual(
                         eager_result.stride(),
                         compiled_result.stride(),
                         f"{fn_name} stride mismatch for {test_name}",
                     )
-                    
+
                     # Verify memory format is respected
                     if memory_format == torch.channels_last:
                         self.assertTrue(
-                            eager_result.is_contiguous(memory_format=torch.channels_last),
+                            eager_result.is_contiguous(
+                                memory_format=torch.channels_last
+                            ),
                             f"{fn_name} didn't respect channels_last format",
                         )
                         self.assertTrue(
-                            compiled_result.is_contiguous(memory_format=torch.channels_last),
+                            compiled_result.is_contiguous(
+                                memory_format=torch.channels_last
+                            ),
                             f"{fn_name} compiled didn't respect channels_last format",
                         )
 
