@@ -692,6 +692,34 @@ def _compute_dense_strides(tensor: torch.Tensor) -> list[int]:
     return out_strides
 
 
+def _apply_stride_logic(
+    result: torch.Tensor,
+    reference: torch.Tensor,
+    memory_format: Optional[torch.memory_format] = None,
+) -> torch.Tensor:
+    """Apply common stride preservation logic for *_like functions.
+
+    Args:
+        result: The newly created tensor
+        reference: The reference tensor whose stride pattern to match
+        memory_format: The requested memory format
+
+    Returns:
+        Tensor with appropriate stride pattern
+    """
+    # Handle explicit memory format
+    if memory_format not in (None, torch.preserve_format):
+        return result.to(memory_format=memory_format)
+
+    # For preserve format (default), match eager mode's stride handling
+    strides = (
+        _compute_dense_strides(reference)
+        if _should_use_dense_strides(reference, memory_format)
+        else reference.stride()
+    )
+    return torch.as_strided(result, reference.shape, strides)
+
+
 @register_decomposition(aten.rand_like)
 def rand_like(
     self: torch.Tensor,
@@ -702,25 +730,13 @@ def rand_like(
     **kwargs: Any,
 ) -> torch.Tensor:
     """Generate random tensor matching input tensor's shape and stride pattern."""
-    # Create base tensor with requested properties
     result = torch.rand(
         self.shape,
         dtype=dtype or self.dtype,
         device=device or self.device,
         **kwargs,
     )
-
-    # Handle explicit memory format
-    if memory_format not in (None, torch.preserve_format):
-        return result.to(memory_format=memory_format)
-
-    # For preserve format (default), match eager mode's stride handling
-    strides = (
-        _compute_dense_strides(self)
-        if _should_use_dense_strides(self, memory_format)
-        else self.stride()
-    )
-    return torch.as_strided(result, self.shape, strides)
+    return _apply_stride_logic(result, self, memory_format)
 
 
 @register_decomposition(aten.randn_like)
@@ -733,25 +749,13 @@ def randn_like(
     **kwargs: Any,
 ) -> torch.Tensor:
     """Generate random normal tensor matching input tensor's shape and stride pattern."""
-    # Create base tensor with requested properties
     result = torch.randn(
         self.shape,
         dtype=dtype or self.dtype,
         device=device or self.device,
         **kwargs,
     )
-
-    # Handle explicit memory format
-    if memory_format not in (None, torch.preserve_format):
-        return result.to(memory_format=memory_format)
-
-    # For preserve format (default), match eager mode's stride handling
-    strides = (
-        _compute_dense_strides(self)
-        if _should_use_dense_strides(self, memory_format)
-        else self.stride()
-    )
-    return torch.as_strided(result, self.shape, strides)
+    return _apply_stride_logic(result, self, memory_format)
 
 
 @register_decomposition(aten.full_like)
@@ -767,7 +771,6 @@ def full_like(
     memory_format: torch.memory_format = torch.preserve_format,
 ) -> torch.Tensor:
     """Generate tensor filled with value matching input tensor's shape and stride pattern."""
-    # Create base tensor with requested properties
     result = torch.full(
         self.shape,
         fill_value,
@@ -776,18 +779,7 @@ def full_like(
         device=device or self.device,
         requires_grad=requires_grad,
     )
-
-    # Handle explicit memory format
-    if memory_format not in (None, torch.preserve_format):
-        return result.to(memory_format=memory_format)
-
-    # For preserve format (default), match eager mode's stride handling
-    strides = (
-        _compute_dense_strides(self)
-        if _should_use_dense_strides(self, memory_format)
-        else self.stride()
-    )
-    return torch.as_strided(result, self.shape, strides)
+    return _apply_stride_logic(result, self, memory_format)
 
 
 @register_decomposition(aten.randint_like.default)
@@ -801,7 +793,6 @@ def randint_like(
     **kwargs: Any,
 ) -> torch.Tensor:
     """Generate random integer tensor matching input tensor's shape and stride pattern."""
-    # Create base tensor with requested properties
     result = aten.randint.low(
         0,
         high,
@@ -810,18 +801,7 @@ def randint_like(
         device=device or self.device,
         **kwargs,
     )
-
-    # Handle explicit memory format
-    if memory_format not in (None, torch.preserve_format):
-        return result.to(memory_format=memory_format)
-
-    # For preserve format (default), match eager mode's stride handling
-    strides = (
-        _compute_dense_strides(self)
-        if _should_use_dense_strides(self, memory_format)
-        else self.stride()
-    )
-    return torch.as_strided(result, self.shape, strides)
+    return _apply_stride_logic(result, self, memory_format)
 
 
 @register_decomposition(aten.randint_like.low_dtype)
@@ -836,7 +816,6 @@ def randint_like_low(
     **kwargs: Any,
 ) -> torch.Tensor:
     """Generate random integer tensor with range matching input tensor's shape and stride pattern."""
-    # Create base tensor with requested properties
     result = aten.randint.low(
         low,
         high,
@@ -845,18 +824,7 @@ def randint_like_low(
         device=device or self.device,
         **kwargs,
     )
-
-    # Handle explicit memory format
-    if memory_format not in (None, torch.preserve_format):
-        return result.to(memory_format=memory_format)
-
-    # For preserve format (default), match eager mode's stride handling
-    strides = (
-        _compute_dense_strides(self)
-        if _should_use_dense_strides(self, memory_format)
-        else self.stride()
-    )
-    return torch.as_strided(result, self.shape, strides)
+    return _apply_stride_logic(result, self, memory_format)
 
 
 @register_decomposition(aten.randint.default)
