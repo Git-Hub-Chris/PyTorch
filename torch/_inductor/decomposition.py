@@ -594,17 +594,21 @@ def get_like_layout(
 def _should_use_dense_strides(
     tensor: torch.Tensor, memory_format: Optional[torch.memory_format]
 ) -> bool:
-    """
-    Determine if we should compute dense strides for the tensor.
-    This matches eager mode's empty_like behavior.
-    """
-    if memory_format is not None and memory_format != torch.preserve_format:
+    """Check if we should compute dense strides for the tensor."""
+    if memory_format not in (None, torch.preserve_format):
         return False
 
-    # Use the same check as eager mode
     import torch._prims_common as prims_common
 
     return not prims_common.is_non_overlapping_and_dense(tensor)
+
+
+def _get_symbolic_value(value, default=None):
+    """Extract concrete value from symbolic integer if possible."""
+    if hasattr(value, "node"):
+        concrete_val = value.node.maybe_as_int()
+        return default if concrete_val is None else concrete_val
+    return value
 
 
 def _compute_dense_strides(tensor: torch.Tensor) -> list[int]:
@@ -613,68 +617,54 @@ def _compute_dense_strides(tensor: torch.Tensor) -> list[int]:
     This matches the behavior of C++ infer_dense_strides.
     """
     ndim = tensor.ndim
-    if ndim == 0:
-        return []
-    if ndim == 1:
-        return [1]
+    if ndim <= 1:
+        return [1] if ndim == 1 else []
 
     sizes = tensor.shape
     strides = tensor.stride()
 
+    # Check if all strides are 0 (common for expanded tensors)
+    all_zero = all(_get_symbolic_value(s, 0) == 0 for s in strides)
+    if all_zero:
+        # For all-zero strides, return standard contiguous strides
+        out_strides = [1]
+        for i in range(ndim - 2, -1, -1):
+            size = _get_symbolic_value(sizes[i + 1], 1)
+            try:
+                out_strides.insert(0, out_strides[0] * size)
+            except TypeError:
+                out_strides.insert(0, out_strides[0] * size)
+        return out_strides
+
     # Create permutation array, initialized as [n-1, n-2, ..., 1, 0]
     perm = list(reversed(range(ndim)))
 
-    # The following sorting algorithm matches TensorIterator's behavior
-    # Using insertion sort to maintain stability
+    # Sort dimensions using insertion sort (stable, matches C++ behavior)
     for i in range(1, ndim):
         dim1 = i
         for j in range(1, i + 1):
             dim0 = i - j
 
             # Get concrete values for comparison
-            stride0 = strides[perm[dim0]]
-            stride1 = strides[perm[dim1]]
-            size0 = sizes[perm[dim0]]
-            size1 = sizes[perm[dim1]]
+            stride0 = _get_symbolic_value(strides[perm[dim0]])
+            stride1 = _get_symbolic_value(strides[perm[dim1]])
 
-            # Convert symbolic values if needed
-            if hasattr(stride0, "node"):
-                stride0_val = stride0.node.maybe_as_int()
-                if stride0_val is None:
-                    continue  # Can't compare, keep current order
-                stride0 = stride0_val
-            if hasattr(stride1, "node"):
-                stride1_val = stride1.node.maybe_as_int()
-                if stride1_val is None:
-                    continue
-                stride1 = stride1_val
-            if hasattr(size0, "node"):
-                size0_val = size0.node.maybe_as_int()
-                if size0_val is None:
-                    size0 = 2  # Assume size >= 2 if unknown
-                else:
-                    size0 = size0_val
-            if hasattr(size1, "node"):
-                size1_val = size1.node.maybe_as_int()
-                if size1_val is None:
-                    size1 = 2
-                else:
-                    size1 = size1_val
+            # Skip comparison if we can't get concrete values
+            if stride0 is None or stride1 is None:
+                continue
 
-            # Comparison logic matching C++ should_swap
-            # If any stride is 0, treat as ambiguous (comparison = 0)
+            # Determine if we should swap
             if stride0 == 0 or stride1 == 0:
-                continue  # Ambiguous, don't swap
-
-            should_swap = False
-            if stride0 < stride1:
-                should_swap = False
-            elif stride0 > stride1:
-                should_swap = True
+                # One or both strides are 0: ambiguous, don't swap
+                continue
+            elif stride0 == stride1:
+                # Equal non-zero strides: sort by size (larger dimension goes first)
+                size0 = _get_symbolic_value(sizes[perm[dim0]], 2)
+                size1 = _get_symbolic_value(sizes[perm[dim1]], 2)
+                should_swap = size0 > size1
             else:
-                # Equal strides, dimension with smaller size goes front
-                if size0 > size1:
-                    should_swap = True
+                # Different strides: smaller stride goes first
+                should_swap = stride0 > stride1
 
             if should_swap:
                 perm[dim0], perm[dim1] = perm[dim1], perm[dim0]
@@ -682,24 +672,22 @@ def _compute_dense_strides(tensor: torch.Tensor) -> list[int]:
             else:
                 break
 
-    # Compute output strides
+    # Compute dense strides based on sorted dimensions
     out_strides = [0] * ndim
     curr_stride = 1
+
     for i in range(ndim):
         idx = perm[i]
         out_strides[idx] = curr_stride
-        # Note: for size 0, we treat it as 1 (doesn't matter since total elements is 0)
-        size = sizes[idx]
-        if hasattr(size, "__gt__"):
-            # Symbolic case - assume > 1 if we can't determine
+
+        # Update stride for next dimension
+        size = _get_symbolic_value(sizes[idx], 1)
+        if size > 1:
             try:
-                if size > 1:
-                    curr_stride *= size
+                curr_stride *= size
             except TypeError:
-                curr_stride *= size
-        else:
-            if size > 1:
-                curr_stride *= size
+                # Handle symbolic multiplication
+                curr_stride = curr_stride * size
 
     return out_strides
 
@@ -713,26 +701,26 @@ def rand_like(
     memory_format: Optional[torch.memory_format] = None,
     **kwargs: Any,
 ) -> torch.Tensor:
-    # Match eager mode behavior: empty_like compacts strides for tensors with gaps
+    """Generate random tensor matching input tensor's shape and stride pattern."""
+    # Create base tensor with requested properties
     result = torch.rand(
-        [*self.size()],
+        self.shape,
         dtype=dtype or self.dtype,
         device=device or self.device,
         **kwargs,
     )
 
-    # If explicit memory format requested, use it
-    if memory_format is not None and memory_format != torch.preserve_format:
+    # Handle explicit memory format
+    if memory_format not in (None, torch.preserve_format):
         return result.to(memory_format=memory_format)
 
     # For preserve format (default), match eager mode's stride handling
-    if _should_use_dense_strides(self, memory_format):
-        # Tensor has gaps, use dense strides that preserve dimension ordering
-        strides = _compute_dense_strides(self)
-        return torch.as_strided(result, self.shape, strides)
-    else:
-        # Tensor is already dense or contiguous, preserve exact strides
-        return torch.as_strided(result, self.shape, self.stride())
+    strides = (
+        _compute_dense_strides(self)
+        if _should_use_dense_strides(self, memory_format)
+        else self.stride()
+    )
+    return torch.as_strided(result, self.shape, strides)
 
 
 @register_decomposition(aten.randn_like)
@@ -744,26 +732,26 @@ def randn_like(
     memory_format: Optional[torch.memory_format] = None,
     **kwargs: Any,
 ) -> torch.Tensor:
-    # Match eager mode behavior: empty_like compacts strides for tensors with gaps
+    """Generate random normal tensor matching input tensor's shape and stride pattern."""
+    # Create base tensor with requested properties
     result = torch.randn(
-        [*self.size()],
+        self.shape,
         dtype=dtype or self.dtype,
         device=device or self.device,
         **kwargs,
     )
 
-    # If explicit memory format requested, use it
-    if memory_format is not None and memory_format != torch.preserve_format:
+    # Handle explicit memory format
+    if memory_format not in (None, torch.preserve_format):
         return result.to(memory_format=memory_format)
 
     # For preserve format (default), match eager mode's stride handling
-    if _should_use_dense_strides(self, memory_format):
-        # Tensor has gaps, use dense strides that preserve dimension ordering
-        strides = _compute_dense_strides(self)
-        return torch.as_strided(result, self.shape, strides)
-    else:
-        # Tensor is already dense or contiguous, preserve exact strides
-        return torch.as_strided(result, self.shape, self.stride())
+    strides = (
+        _compute_dense_strides(self)
+        if _should_use_dense_strides(self, memory_format)
+        else self.stride()
+    )
+    return torch.as_strided(result, self.shape, strides)
 
 
 @register_decomposition(aten.full_like)
@@ -778,27 +766,28 @@ def full_like(
     requires_grad: bool = False,
     memory_format: torch.memory_format = torch.preserve_format,
 ) -> torch.Tensor:
-    target_format = get_like_layout(self, memory_format)
-
-    if self.is_contiguous() or target_format != torch.contiguous_format:
-        return torch.full(
-            [*self.size()],
-            fill_value,
-            dtype=dtype or self.dtype,
-            layout=layout or self.layout,
-            device=device or self.device,
-            requires_grad=requires_grad,
-        ).to(memory_format=target_format)
-
+    """Generate tensor filled with value matching input tensor's shape and stride pattern."""
+    # Create base tensor with requested properties
     result = torch.full(
-        [*self.size()],
+        self.shape,
         fill_value,
         dtype=dtype or self.dtype,
         layout=layout or self.layout,
         device=device or self.device,
         requires_grad=requires_grad,
     )
-    return torch.as_strided(result, self.shape, self.stride())
+
+    # Handle explicit memory format
+    if memory_format not in (None, torch.preserve_format):
+        return result.to(memory_format=memory_format)
+
+    # For preserve format (default), match eager mode's stride handling
+    strides = (
+        _compute_dense_strides(self)
+        if _should_use_dense_strides(self, memory_format)
+        else self.stride()
+    )
+    return torch.as_strided(result, self.shape, strides)
 
 
 @register_decomposition(aten.randint_like.default)
@@ -811,27 +800,28 @@ def randint_like(
     memory_format: Optional[torch.memory_format] = None,
     **kwargs: Any,
 ) -> torch.Tensor:
-    target_format = get_like_layout(self, memory_format)
-
-    if self.is_contiguous() or target_format != torch.contiguous_format:
-        return aten.randint.low(
-            0,
-            high,
-            [*self.size()],
-            dtype=dtype or self.dtype,
-            device=device or self.device,
-            **kwargs,
-        ).to(memory_format=target_format)
-
+    """Generate random integer tensor matching input tensor's shape and stride pattern."""
+    # Create base tensor with requested properties
     result = aten.randint.low(
         0,
         high,
-        [*self.size()],
+        self.shape,
         dtype=dtype or self.dtype,
         device=device or self.device,
         **kwargs,
     )
-    return torch.as_strided(result, self.shape, self.stride())
+
+    # Handle explicit memory format
+    if memory_format not in (None, torch.preserve_format):
+        return result.to(memory_format=memory_format)
+
+    # For preserve format (default), match eager mode's stride handling
+    strides = (
+        _compute_dense_strides(self)
+        if _should_use_dense_strides(self, memory_format)
+        else self.stride()
+    )
+    return torch.as_strided(result, self.shape, strides)
 
 
 @register_decomposition(aten.randint_like.low_dtype)
@@ -845,27 +835,28 @@ def randint_like_low(
     memory_format: Optional[torch.memory_format] = None,
     **kwargs: Any,
 ) -> torch.Tensor:
-    target_format = get_like_layout(self, memory_format)
-
-    if self.is_contiguous() or target_format != torch.contiguous_format:
-        return aten.randint.low(
-            low,
-            high,
-            [*self.size()],
-            dtype=dtype or self.dtype,
-            device=device or self.device,
-            **kwargs,
-        ).to(memory_format=target_format)
-
+    """Generate random integer tensor with range matching input tensor's shape and stride pattern."""
+    # Create base tensor with requested properties
     result = aten.randint.low(
         low,
         high,
-        [*self.size()],
+        self.shape,
         dtype=dtype or self.dtype,
         device=device or self.device,
         **kwargs,
     )
-    return torch.as_strided(result, self.shape, self.stride())
+
+    # Handle explicit memory format
+    if memory_format not in (None, torch.preserve_format):
+        return result.to(memory_format=memory_format)
+
+    # For preserve format (default), match eager mode's stride handling
+    strides = (
+        _compute_dense_strides(self)
+        if _should_use_dense_strides(self, memory_format)
+        else self.stride()
+    )
+    return torch.as_strided(result, self.shape, strides)
 
 
 @register_decomposition(aten.randint.default)
