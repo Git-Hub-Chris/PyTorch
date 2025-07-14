@@ -591,15 +591,6 @@ def get_like_layout(
         return memory_format
 
 
-def _should_use_dense_strides(
-    tensor: torch.Tensor, memory_format: Optional[torch.memory_format]
-) -> bool:
-    """Check if we should compute dense strides for the tensor."""
-    if memory_format not in (None, torch.preserve_format):
-        return False
-    return not utils.is_non_overlapping_and_dense(tensor)
-
-
 def _get_symbolic_value(value, default=None):
     """Extract concrete value from symbolic integer if possible."""
     if hasattr(value, "node"):
@@ -709,12 +700,17 @@ def _apply_stride_logic(
         return result.to(memory_format=memory_format)
 
     # For preserve format (default), match eager mode's stride handling
-    strides = (
-        _compute_dense_strides(reference)
-        if _should_use_dense_strides(reference, memory_format)
-        else reference.stride()
-    )
-    return torch.as_strided(result, reference.shape, strides)
+    if utils.is_non_overlapping_and_dense(reference):
+        # Case 1: Preserve exact strides for non-overlapping dense tensors
+        return torch.as_strided(result, reference.shape, reference.stride())
+    elif reference.layout == torch.strided:
+        # Case 2: Compute dense strides for strided tensors that aren't dense
+        strides = _compute_dense_strides(reference)
+        return torch.as_strided(result, reference.shape, strides)
+    else:
+        # Case 3: For non-strided layouts, just return the result as-is
+        # (letting it use its default memory format)
+        return result
 
 
 @register_decomposition(aten.rand_like)
