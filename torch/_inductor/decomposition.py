@@ -708,9 +708,10 @@ def _apply_stride_logic(
         strides = _compute_dense_strides(reference)
         return torch.as_strided(result, reference.shape, strides)
     else:
-        # Case 3: For non-strided layouts, just return the result as-is
-        # (letting it use its default memory format)
-        return result
+        # Case 3: For non-strided layouts, use suggested memory format
+        # This matches the C++ fallback behavior
+        suggested_format = utils.suggest_memory_format(reference)
+        return result.to(memory_format=suggested_format)
 
 
 @register_decomposition(aten.rand_like)
