@@ -37,6 +37,7 @@ from torch.distributed.elastic.multiprocessing.subprocess_handler import (
     SubprocessHandler,
 )
 from torch.distributed.elastic.multiprocessing.tail_log import TailLog
+from torch.distributed.numa_binding import NumaOptions
 
 
 IS_WINDOWS = sys.platform == "win32"
@@ -811,6 +812,7 @@ class SubprocessContext(PContext):
         envs: dict[int, dict[str, str]],
         logs_specs: LogsSpecs,
         log_line_prefixes: Optional[dict[int, str]] = None,
+        numa_options: Optional[NumaOptions] = None,
     ):
         super().__init__(
             name,
@@ -825,6 +827,7 @@ class SubprocessContext(PContext):
         self._running_local_ranks: set[int] = set(range(self.nprocs))
         self._failures: dict[int, ProcessFailure] = {}
         self.subprocess_handlers: dict[int, SubprocessHandler] = {}
+        self._numa_options: Optional[NumaOptions] = numa_options
 
     def _start(self):
         if self.subprocess_handlers:
@@ -839,6 +842,7 @@ class SubprocessContext(PContext):
                 stdout=self.stdouts[local_rank],
                 stderr=self.stderrs[local_rank],
                 local_rank_id=local_rank,
+                numa_options=self._numa_options,
             )
             for local_rank in range(self.nprocs)
         }
