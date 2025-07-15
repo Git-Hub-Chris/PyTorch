@@ -1,4 +1,5 @@
 # mypy: allow-untyped-defs
+import torch
 import functools
 from collections import namedtuple
 from collections.abc import Iterator, Sized
@@ -74,6 +75,7 @@ class MapperIterDataPipe(IterDataPipe[_T_co]):
         input_col=None,
         output_col=None,
     ) -> None:
+        torch._C._log_api_usage_once("python.data_pipes.map")
         super().__init__()
         self.datapipe = datapipe
 
