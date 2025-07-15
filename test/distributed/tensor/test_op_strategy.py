@@ -1,6 +1,8 @@
 # Owner(s): ["oncall: distributed"]
 
 import functools
+import itertools
+import random
 from contextlib import contextmanager
 from copy import deepcopy
 from itertools import chain
@@ -33,6 +35,7 @@ from torch.distributed.tensor._ops._einsum_strategy import (
     gen_einsum_strategies,
 )
 from torch.distributed.tensor._ops.utils import (
+    flatten_strategy_args,
     generate_redistribute_costs,
     register_op_strategy,
     replicate_op_strategy,
@@ -43,6 +46,16 @@ from torch.testing._internal.distributed._tensor.common_dtensor import (
     DTensorTestBase,
     with_comms,
 )
+
+
+try:
+    from torch.utils import _cxx_pytree as pytree
+except ImportError:
+    from torch.utils import _pytree as pytree  # type: ignore[no-redef]
+
+
+def extract_tensor_meta(t) -> TensorMeta:
+    return TensorMeta(t.shape, t.stride(), t.dtype)
 
 
 class TestEinsumDims(TestCase):
@@ -161,9 +174,6 @@ class TestEinsumStrategies(DTensorOpTestBase):
 
 
 class TestCostModel(DTensorOpTestBase):
-    def _extract_tensor_meta(self, t) -> TensorMeta:
-        return TensorMeta(t.shape, t.stride(), t.dtype)
-
     @property
     def world_size(self) -> int:
         return 4
@@ -175,7 +185,7 @@ class TestCostModel(DTensorOpTestBase):
         partial_placement = (Partial(),)
 
         global_tensor = torch.randn(10, 10)
-        global_tensor_meta = self._extract_tensor_meta(global_tensor)
+        global_tensor_meta = extract_tensor_meta(global_tensor)
 
         # shard spec
         shard_spec = DTensorSpec(mesh_1d, shard_placement, global_tensor_meta)
@@ -210,9 +220,9 @@ class TestCostModel(DTensorOpTestBase):
         partial_placement = (Partial(),)
         shard1_placement = (Shard(1),)
 
-        shard0_tensor_meta = self._extract_tensor_meta(torch.randn(8))
-        partial_tensor_meta = self._extract_tensor_meta(torch.randn(50, 6))
-        shard1_tensor_meta = self._extract_tensor_meta(torch.randn(6, 8))
+        shard0_tensor_meta = extract_tensor_meta(torch.randn(8))
+        partial_tensor_meta = extract_tensor_meta(torch.randn(50, 6))
+        shard1_tensor_meta = extract_tensor_meta(torch.randn(6, 8))
 
         # shard spec
         shard0_spec = DTensorSpec(mesh, shard0_placement, shard0_tensor_meta)
@@ -256,7 +266,7 @@ class TestCostModel(DTensorOpTestBase):
         partial_placement = (Partial(), Partial())
 
         global_tensor = torch.randn(8, 8)
-        global_tensor_meta = self._extract_tensor_meta(global_tensor)
+        global_tensor_meta = extract_tensor_meta(global_tensor)
 
         # shard spec
         shard_spec = DTensorSpec(mesh_2d, shard_placement, global_tensor_meta)
@@ -285,8 +295,8 @@ class TestCostModel(DTensorOpTestBase):
         mesh = self.build_device_mesh()
         lhs_tensor = torch.randn(6, 8)
         rhs_tensor = torch.randn(8, 12)
-        lhs_tensor_meta = self._extract_tensor_meta(lhs_tensor)
-        rhs_tensor_meta = self._extract_tensor_meta(rhs_tensor)
+        lhs_tensor_meta = extract_tensor_meta(lhs_tensor)
+        rhs_tensor_meta = extract_tensor_meta(rhs_tensor)
 
         mm_combs = (
             (Shard(0), Replicate()),
@@ -331,8 +341,8 @@ class TestCostModel(DTensorOpTestBase):
         mesh = self.build_device_mesh()
         lhs_tensor = torch.randn(8, 6, 8)
         rhs_tensor = torch.randn(8, 8, 12)
-        lhs_tensor_meta = self._extract_tensor_meta(lhs_tensor)
-        rhs_tensor_meta = self._extract_tensor_meta(rhs_tensor)
+        lhs_tensor_meta = extract_tensor_meta(lhs_tensor)
+        rhs_tensor_meta = extract_tensor_meta(rhs_tensor)
 
         bmm_combs = (
             (Shard(0), Shard(0)),
@@ -455,29 +465,16 @@ def manual_strategy(
         placements=tuple(new_placement),
     )
     output_strategy = OpStrategy([])
-    for _ in select_strategy_x.strategies:
-        output_strategy.strategies.append(
-            OpSpec(
-                output_specs=output_spec,
-                input_specs=[new_input_specs, new_input_specs],
-                redistribute_cost=[
-                    generate_redistribute_costs(select_strategy_x, new_input_specs),
-                    generate_redistribute_costs(select_strategy_x, new_input_specs),
-                ],
-            )
+    output_strategy.strategies.append(
+        OpSpec(
+            output_specs=output_spec,
+            input_specs=[new_input_specs, new_input_specs],
+            redistribute_cost=[
+                generate_redistribute_costs(select_strategy_x, new_input_specs),
+                generate_redistribute_costs(select_strategy_y, new_input_specs),
+            ],
         )
-    for _ in select_strategy_y.strategies:
-        output_strategy.strategies.append(
-            OpSpec(
-                output_specs=output_spec,
-                input_specs=[new_input_specs, new_input_specs],
-                redistribute_cost=[
-                    generate_redistribute_costs(select_strategy_y, new_input_specs),
-                    generate_redistribute_costs(select_strategy_y, new_input_specs),
-                ],
-            )
-        )
-
+    )
     return output_strategy
 
 
@@ -506,9 +503,58 @@ def op_strategy_context(op_overload, strategy_func, schema_info=None):
         propagator.propagate_op_sharding.cache.cache_clear()
 
 
-class DistTensorFallbackStrategyRegistrationTest(DTensorTestBase):
+def detect_exists_identical_opspec(*args, op, mesh, strategy_function) -> bool:
+    """
+    Given sample input args, detect if identical OpSpecs exists under the same
+    OpStrategy.
+
+    """
+    tree_args, args_spec = pytree.tree_flatten(args)
+    # metadata for each argument
+    arg_tensor_metadata = [extract_tensor_meta(i) for i in args]
+    # possible combination of placements for each arg
+    arg_placement_comb = []
+    for i in tree_args:
+        if isinstance(i, torch.Tensor):
+            # possible placement choice for argument i
+            placement_choices = (Replicate(), *[Shard(i) for i in range(i.ndim)])
+            # expand placement choice into full Placements for argument i
+            arg_placement_comb.append(
+                list(itertools.product(placement_choices, repeat=mesh.ndim))
+            )
+            random.shuffle(arg_placement_comb[-1])
+
+    arg_opspec_list = []
+    for idx, arg_placement in enumerate(arg_placement_comb):
+        arg_opspec_list.append([])
+        for placement in arg_placement:
+            arg_opspec_list[idx].append(
+                OpSpec(
+                    output_specs=DTensorSpec(
+                        mesh, placement, tensor_meta=arg_tensor_metadata[idx]
+                    )
+                )
+            )
+
+    op_schema = OpSchema(
+        op,
+        args_schema=(tuple(OpStrategy(i) for i in arg_opspec_list)),
+        kwargs_schema={},
+    )
+    with op_strategy_context(op, strategy_function):
+        output_strategy = strategy_function(op_schema)
+        # OpSpec doesn't have hashing, convert to str to compare
+        output_strategy_str_list = [
+            str(j)
+            for i in flatten_strategy_args([output_strategy])
+            for j in i.strategies
+        ]
+        return len(output_strategy_str_list) == len(set(output_strategy_str_list))
+
+
+class DistTensorReplicateStrategyRegistrationTest(DTensorTestBase):
     @with_comms
-    def test_fallback_strategy_placement(self):
+    def test_replicate_strategy_placement(self):
         mesh = init_device_mesh(self.device_type, (2, self.world_size // 2))
         test_op = torch.ops.mylib.numpy_sin
         with op_strategy_context(test_op.default, replicate_op_strategy):
@@ -522,10 +568,29 @@ class DistTensorFallbackStrategyRegistrationTest(DTensorTestBase):
             self.assertEqual(output_dt.placements, [Replicate(), Replicate()])
 
     @with_comms
+    def test_no_identical_strategies(
+        self,
+    ):
+        # Test if there are any identical OpSpecs in the output strategy.
+        mesh = init_device_mesh(self.device_type, (2, self.world_size // 2))
+        test_op = torch.ops.mylib.numpy_sin
+        x = torch.randn([8, 16, 8], device=self.device_type)
+        y = torch.randn([8, 16, 8], device=self.device_type)
+        self.assertTrue(
+            detect_exists_identical_opspec(
+                x,
+                y,
+                op=test_op.default,
+                mesh=mesh,
+                strategy_function=replicate_op_strategy,
+            )
+        )
+
+    @with_comms
     @patch(
         "torch.distributed.tensor._sharding_prop.ShardingPropagator._select_strategy"
     )
-    def test_fallback_strategy_cost(self, mock_select_strategy):
+    def test_replicate_strategy_cost(self, mock_select_strategy):
         costs_from__select_strategy: list[float] = []
 
         def mock_select_func(strategy):
@@ -575,7 +640,7 @@ class DistTensorFallbackStrategyRegistrationTest(DTensorTestBase):
                 self.assertEqual(expected_cost, fallback_cost)
 
     @with_comms
-    def test_tuple_fallback_strategy_placement(self):
+    def test_tuple_replicate_strategy_placement(self):
         mesh = init_device_mesh(self.device_type, (2, self.world_size // 2))
         test_op = torch.ops.mylib.numpy_tuple_sin
         with op_strategy_context(
