@@ -122,7 +122,6 @@ def replicate_op_strategy(op_schema: OpSchema) -> StrategyType:
     # kwarg_inputs_strategy = op_schema.kwargs_schema
     output_strategy = OpStrategy([])
     output_type = [str(ret.type) for ret in op_schema.op._schema.returns]
-    # input_type = [str(arg.type) for arg in op_schema.op._schema.arguments]
     # TODO(zpcore): Confirm if view op can be handle properly or not. Prevent
     # handling view ops until confirmed.
     if op_schema.op.is_view:
