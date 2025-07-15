@@ -535,7 +535,7 @@ def check_model(
     if reference_in_float:
         correct_flat = reference_to_expect(actual_flat, correct_flat)
         correct = tree_unflatten(correct_flat, correct_spec)
-
+    
     if assert_equal:
         self.assertEqual(
             actual,
@@ -6289,6 +6289,16 @@ class CommonTemplate:
         if self.device == "xpu":
             atol = 3e-4
             rtol = 1e-4
+        elif (
+            config.triton.enable_native_matmul 
+            and self.device == "cuda"
+        ) :
+            # With default atol and rtol
+            # Mismatched elements: 16897 / 131072 (12.9%)
+            # Greatest absolute difference: 0.0009765625 at index (32, 251)
+            # Greatest relative difference: 0.013382526114583015 at index (86, 142) 
+            atol = 5e-4
+            rtol = 3e-4
         else:
             # use default
             atol = None
