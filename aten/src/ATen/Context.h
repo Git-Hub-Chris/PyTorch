@@ -162,6 +162,12 @@ class TORCH_API Context {
   static bool hasROCM() {
     return detail::getCUDAHooks().hasROCM();
   }
+  static bool hasCKSDPA() {
+    return detail::getCUDAHooks().hasCKSDPA();
+  }
+  static bool hasCKGEMM() {
+    return detail::getCUDAHooks().hasCKGEMM();
+  }
   static bool hasHIP() {
     return detail::getHIPHooks().hasHIP();
   }
@@ -250,7 +256,7 @@ class TORCH_API Context {
   at::BlasBackend blasPreferredBackend();
   void setBlasPreferredBackend(at::BlasBackend);
 
-  at::ROCmFABackend getROCmFAPreferredBackend() const;
+  at::ROCmFABackend getROCmFAPreferredBackend();
   void setROCmFAPreferredBackend(at::ROCmFABackend);
 
   // Note [Enabling Deterministic Operations]
