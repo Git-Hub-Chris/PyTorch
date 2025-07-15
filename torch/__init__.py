@@ -2689,6 +2689,25 @@ if "TORCH_CUDA_SANITIZER" in os.environ:
 import torch.fx.experimental.sym_node
 from torch import fx as fx
 
+# Check For removed CUDA architectures
+from torch.torch_version import TorchVersion
+
+
+cuda_version = None
+cuda_version = TorchVersion(getattr(torch.version, "cuda", "0.0"))
+if (
+    cuda_version
+    and cuda_version >= "12.8"
+    and torch.cuda.is_available()
+    and torch.cuda.get_device_capability("cuda") < (7, 0)
+):
+    import warnings
+
+    warnings.warn(
+        "Support for Maxwell and Pascal architectures is removed for CUDA 12.8+ builds"
+        "Please see https://github.com/pytorch/pytorch/issues/157517"
+    )
+
 
 # Register MPS specific decomps
 torch.backends.mps._init()
