@@ -6963,6 +6963,8 @@ jobs:
           .github\scripts\kill_active_ssh_sessions.ps1
   wheel-py3_13t-xpu-test:  # Testing
     if: ${{ github.repository_owner == 'pytorch' }}
+    permissions:
+      contents: read
     needs:
       - wheel-py3_13t-xpu-build
       - get-label-type
