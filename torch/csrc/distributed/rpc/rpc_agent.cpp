@@ -56,7 +56,7 @@ RpcAgent::RpcAgent(
 
 RpcAgent::~RpcAgent() {
   if (rpcAgentRunning_.load()) {
-    shutdown();
+    safeShutdown();
   }
 }
 
@@ -75,8 +75,18 @@ void RpcAgent::shutdown() {
   if (rpcRetryThread_.joinable()) {
     rpcRetryThread_.join();
   }
-  // NOLINTNEXTLINE(clang-analyzer-cplusplus.PureVirtualCall)
   shutdownImpl();
+}
+
+void RpcAgent::safeShutdown() {
+  TORCH_ASSERT_NO_GIL_WITHOUT_PYTHON_DEP();
+  std::unique_lock<std::mutex> lock(rpcRetryMutex_);
+  rpcAgentRunning_.store(false);
+  lock.unlock();
+  rpcRetryMapCV_.notify_one();
+  if (rpcRetryThread_.joinable()) {
+    rpcRetryThread_.join();
+  }
 }
 
 c10::intrusive_ptr<JitFuture> RpcAgent::sendWithRetries(
