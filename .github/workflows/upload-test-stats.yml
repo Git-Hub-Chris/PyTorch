@@ -108,6 +108,8 @@ jobs:
   check-api-rate:
     if: ${{ always() && github.repository_owner == 'pytorch' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     continue-on-error: true
     steps:
       - name: Get our GITHUB_TOKEN API limit usage
