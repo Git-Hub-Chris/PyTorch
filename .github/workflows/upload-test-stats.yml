@@ -12,6 +12,8 @@ jobs:
   get_workflow_conclusion:
     if: github.repository_owner == 'pytorch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       conclusion: ${{ fromJson(steps.get_conclusion.outputs.data).conclusion }}
     steps:
