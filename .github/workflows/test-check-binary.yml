@@ -7,6 +7,9 @@ on:
       - .ci/pytorch/check_binary.sh
       - .ci/pytorch//smoke_test/smoke_test.py
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}-${{ github.event_name == 'workflow_dispatch' }}
   cancel-in-progress: true
